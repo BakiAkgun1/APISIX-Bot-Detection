@@ -182,7 +182,6 @@ Request 4: HTTP 429
   RATE LIMITED!
 ```
 
-
 <img width="605" height="529" alt="image" src="https://github.com/user-attachments/assets/426eb0aa-8896-4415-85b9-40f22195e24e" />
 
 ## 📁 Proje Yapısı
@@ -489,13 +488,6 @@ Bu kurulum ile aşağıdaki özellikleri elde ettik:
 ✅ **High Availability**: Kubernetes üzerinde ölçeklenebilir mimari  
 ✅ **Production Ready**: APISIX enterprise-grade API Gateway  
 
-## 🤝 Katkıda Bulunma
-
-1. Fork yapın
-2. Feature branch oluşturun (`git checkout -b feature/amazing-feature`)
-3. Commit yapın (`git commit -m 'Add amazing feature'`)
-4. Push yapın (`git push origin feature/amazing-feature`)
-5. Pull Request oluşturun
 
 ## 📄 Lisans
 
