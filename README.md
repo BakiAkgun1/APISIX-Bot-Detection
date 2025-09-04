@@ -4,13 +4,13 @@ Bu proje, **APISIX API Gateway** kullanarak bot trafiğini tespit eden ve farkl�
 
 ## 🎯 Proje Özeti
 
-- ** Bot Detection**: User-Agent header'ına göre bot trafiği tespiti
-- ** Intelligent Routing**: Bot'lar ve normal kullanıcılar için farklı servisler
-- ** Rate Limiting**: Bot'lar için kısıtlı (5 req/s), normal kullanıcılar için yüksek (50 req/s) limit
-- ** Kubernetes Native**: Tamamen Kubernetes üzerinde çalışan çözüm
-- ** Production Ready**: APISIX enterprise-grade API Gateway
+- **Bot Detection**: User-Agent header'ına göre bot trafiği tespiti
+- **Intelligent Routing**: Bot'lar ve normal kullanıcılar için farklı servisler
+- **Rate Limiting**: Bot'lar için kısıtlı (5 req/s), normal kullanıcılar için yüksek (50 req/s) limit
+- **Kubernetes Native**: Tamamen Kubernetes üzerinde çalışan çözüm
+- **Production Ready**: APISIX enterprise-grade API Gateway
 
-##  Sistem Mimarisi
+## Sistem Mimarisi
 
 ```
 Internet → APISIX Gateway → Bot Detection → Route Decision
