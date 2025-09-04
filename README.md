@@ -165,6 +165,7 @@ Request 3: HTTP 429
 Request 4: HTTP 429
   RATE LIMITED!
 ```
+<img width="605" height="529" alt="image" src="https://github.com/user-attachments/assets/426eb0aa-8896-4415-85b9-40f22195e24e" />
 
 ##  Proje Yapısı
 
