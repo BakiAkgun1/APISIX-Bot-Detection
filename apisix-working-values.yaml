@@ -1,0 +1,16 @@
+apisix:
+  image:
+    repository: apache/apisix
+    tag: "3.9.0-debian"
+  initContainer:
+    image: busybox
+    tag: "1.35"
+
+ingress-controller:
+  enabled: true
+
+etcd:
+  enabled: true
+  image:
+    repository: bitnami/etcd
+    tag: "3.5.9-debian-11-r2"
