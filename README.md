@@ -1,16 +1,16 @@
-#  APISIX Bot Detection & Rate Limiting Project
+# APISIX Bot Detection & Rate Limiting Project
 
 Bu proje, **APISIX API Gateway** kullanarak bot trafiğini tespit eden ve farklı rate limiting uygulayan bir **Kubernetes** kurulumudur.
 
 ## 🎯 Proje Özeti
 
-- ** Bot Detection**: User-Agent header'ına göre bot trafiği tespiti
-- ** Intelligent Routing**: Bot'lar ve normal kullanıcılar için farklı servisler
-- ** Rate Limiting**: Bot'lar için kısıtlı (5 req/s), normal kullanıcılar için yüksek (50 req/s) limit
-- ** Kubernetes Native**: Tamamen Kubernetes üzerinde çalışan çözüm
-- ** Production Ready**: APISIX enterprise-grade API Gateway
+- **Bot Detection**: User-Agent header'ına göre bot trafiği tespiti
+- **Intelligent Routing**: Bot'lar ve normal kullanıcılar için farklı servisler
+- **Rate Limiting**: Bot'lar için kısıtlı (5 req/s), normal kullanıcılar için yüksek (50 req/s) limit
+- **Kubernetes Native**: Tamamen Kubernetes üzerinde çalışan çözüm
+- **Production Ready**: APISIX enterprise-grade API Gateway
 
-##  Sistem Mimarisi
+## Sistem Mimarisi
 
 ```
 Internet → APISIX Gateway → Bot Detection → Route Decision
@@ -23,14 +23,14 @@ Internet → APISIX Gateway → Bot Detection → Route Decision
 
 **Cluster Yapısı**: 4 nodeluk Kubernetes cluster (WSL Ubuntu üzerinde)
 
-##  Gereksinimler
+## 📋 Gereksinimler
 
 - **Kubernetes Cluster** (4 nodeluk cluster ile test edildi)
 - **kubectl** CLI tool
 - **Helm 3.x**
 - **WSL2 Ubuntu** (Windows kullanıcıları için)
 
-##  Kurulum Adımları
+## 🚀 Kurulum Adımları
 
 ### 0. WSL Ubuntu Kurulumu (Windows için)
 
@@ -166,8 +166,11 @@ Request 4: HTTP 429
   RATE LIMITED!
 ```
 image.png 
+<img width="605" height="529" alt="image" src="https://github.com/user-attachments/assets/426eb0aa-8896-4415-85b9-40f22195e24e" />
 
-##  Proje Yapısı
+<img width="605" height="529" alt="image" src="https://github.com/user-attachments/assets/426eb0aa-8896-4415-85b9-40f22195e24e" />
+
+## 📁 Proje Yapısı
 
 ```
 apisix-bot-routing/
@@ -208,7 +211,7 @@ Bu regex aşağıdaki User-Agent'ları yakalar:
 - **Bot Route Priority**: 100 (yüksek öncelik)
 - **Normal Route Priority**: 50 (düşük öncelik)
 
-##  Troubleshooting
+## 🔧 Troubleshooting
 
 ### 1. Pod'lar Başlamıyor
 
@@ -433,7 +436,7 @@ Bu kurulum ile aşağıdaki özellikleri elde ettik:
 ✅ **High Availability**: Kubernetes üzerinde ölçeklenebilir mimari  
 ✅ **Production Ready**: APISIX enterprise-grade API Gateway  
 
-##  Katkıda Bulunma
+## 🤝 Katkıda Bulunma
 
 1. Fork yapın
 2. Feature branch oluşturun (`git checkout -b feature/amazing-feature`)
