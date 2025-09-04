@@ -165,6 +165,7 @@ Request 3: HTTP 429
 Request 4: HTTP 429
   RATE LIMITED!
 ```
+image.png 
 
 ##  Proje Yapısı
 
@@ -246,7 +247,166 @@ kubectl describe service portal-svc
 kubectl describe service portal-svc-bot
 ```
 
-##  Temizleme
+## 🚪 Uygulamayı Kapatma ve Tekrar Başlatma
+
+### WSL Ubuntu'da Uygulamayı Kapatma
+
+#### 1. Port Forward'ları Kapat
+
+```bash
+# Tüm port forward işlemlerini kapat
+pkill -f port-forward
+
+# Veya manuel olarak process ID'yi bul ve öldür
+ps aux | grep port-forward
+kill <process_id>
+```
+
+#### 2. Portal Servislerini Kapat
+
+```bash
+# Portal deploymentlarını sil
+kubectl delete deployment portal-app portal-bot-app
+
+# Portal servislerini sil
+kubectl delete service portal-svc portal-svc-bot
+
+# Veya YAML dosyalarıyla sil
+kubectl delete -f k8s/portal-svc.yaml
+kubectl delete -f k8s/portal-svc-bot.yaml
+```
+
+#### 3. APISIX Route'larını Temizle
+
+```bash
+# Admin API ile route'ları sil
+kubectl port-forward -n apisix service/apisix-admin 9180:9180 &
+
+curl -X DELETE \
+  -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
+  http://localhost:9180/apisix/admin/routes/1
+
+curl -X DELETE \
+  -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
+  http://localhost:9180/apisix/admin/routes/2
+
+pkill -f port-forward
+```
+
+#### 4. APISIX'i Tamamen Kapat (İsteğe Bağlı)
+
+```bash
+# APISIX Helm release'ini sil
+helm uninstall apisix -n apisix
+
+# APISIX namespace'ini sil
+kubectl delete namespace apisix
+```
+
+### WSL Ubuntu'da Uygulamayı Tekrar Başlatma
+
+#### 1. Hızlı Başlatma (APISIX Zaten Kuruluysa)
+
+```bash
+# Portal servislerini başlat
+kubectl apply -f k8s/portal-svc.yaml
+kubectl apply -f k8s/portal-svc-bot.yaml
+
+# Pod'ların hazır olmasını bekle
+kubectl wait --for=condition=ready pod --all --timeout=120s
+
+# APISIX route'larını ekle
+kubectl port-forward -n apisix service/apisix-admin 9180:9180 &
+
+# Bot route
+curl -X PUT \
+  -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "uri": "/*",
+    "priority": 100,
+    "vars": [["http_user_agent", "~~", ".*(bot|crawler|spider|scraper|googlebot|bingbot).*"]],
+    "upstream": {
+      "type": "roundrobin",
+      "nodes": {
+        "portal-svc-bot.default.svc.cluster.local:80": 1
+      }
+    },
+    "plugins": {
+      "limit-req": {
+        "rate": 5,
+        "burst": 10,
+        "key": "remote_addr",
+        "key_type": "var",
+        "rejected_code": 429,
+        "rejected_msg": "Bot rate limit exceeded",
+        "nodelay": true
+      }
+    }
+  }' \
+  http://localhost:9180/apisix/admin/routes/1
+
+# Normal route
+curl -X PUT \
+  -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "uri": "/*",
+    "priority": 50,
+    "upstream": {
+      "type": "roundrobin",
+      "nodes": {
+        "portal-svc.default.svc.cluster.local:80": 1
+      }
+    },
+    "plugins": {
+      "limit-req": {
+        "rate": 50,
+        "burst": 100,
+        "key": "remote_addr",
+        "key_type": "var",
+        "rejected_code": 429
+      }
+    }
+  }' \
+  http://localhost:9180/apisix/admin/routes/2
+
+pkill -f port-forward
+```
+
+#### 2. Tam Kurulum (APISIX Silinmişse)
+
+```bash
+# APISIX namespace oluştur
+kubectl create namespace apisix
+
+# APISIX kur
+helm install apisix apisix/apisix \
+  --namespace apisix \
+  --values apisix-working-values.yaml \
+  --wait \
+  --timeout 10m
+
+# Yukarıdaki "Hızlı Başlatma" kısmını çalıştır
+```
+
+#### 3. WSL Kapatıldıktan Sonra Tekrar Açma
+
+```bash
+# WSL Ubuntu'yu yeniden başlat
+wsl --shutdown
+wsl -d Ubuntu
+
+# Kubernetes cluster'ın çalıştığını kontrol et
+kubectl cluster-info
+
+# Eğer cluster çalışmıyorsa, Docker Desktop'ı başlat
+# Windows'ta Docker Desktop uygulamasını aç
+
+# Cluster hazır olduktan sonra yukarıdaki "Hızlı Başlatma" komutlarını çalıştır
+```
+
+## 🧹 Temizleme
 
 ```bash
 # APISIX'i kaldır
@@ -263,10 +423,10 @@ kubectl delete -f k8s/bot-routing-fixed.yaml
 kubectl delete namespace apisix
 ```
 
-##  Sonuç
+## 🎉 Sonuç
 
 Bu kurulum ile aşağıdaki özellikleri elde ettik:
-image.png 
+
 ✅ **Bot Detection**: User-Agent tabanlı bot tespiti  
 ✅ **Intelligent Routing**: Bot ve normal kullanıcılar için farklı servisler  
 ✅ **Rate Limiting**: Dinamik rate limiting (Bot: 5 req/s, Normal: 50 req/s)  
