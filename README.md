@@ -112,6 +112,22 @@ kubectl port-forward -n apisix service/apisix-gateway 8080:80 &
 kubectl port-forward -n apisix service/apisix-admin 9180:9180 &
 ```
 
+### 8. Otomatik Script'ler ile Yönetim
+
+```bash
+# Script'leri çalıştırılabilir yap
+chmod +x scripts/*.sh
+
+# Uygulamayı başlat
+./scripts/start.sh
+
+# Uygulamayı test et
+./scripts/test.sh
+
+# Uygulamayı kapat
+./scripts/stop.sh
+```
+
 ## 🧪 Test Etme
 
 ### 1. Normal Kullanıcı Testi
@@ -165,8 +181,7 @@ Request 3: HTTP 429
 Request 4: HTTP 429
   RATE LIMITED!
 ```
-image.png 
-<img width="605" height="529" alt="image" src="https://github.com/user-attachments/assets/426eb0aa-8896-4415-85b9-40f22195e24e" />
+
 
 <img width="605" height="529" alt="image" src="https://github.com/user-attachments/assets/426eb0aa-8896-4415-85b9-40f22195e24e" />
 
@@ -176,10 +191,14 @@ image.png
 apisix-bot-routing/
 ├── README.md                           # Bu dosya
 ├── apisix-working-values.yaml          # APISIX Helm values (çalışan versiyon)
-└── k8s/
-    ├── portal-svc.yaml                 # Normal kullanıcılar için portal servisi
-    ├── portal-svc-bot.yaml             # Bot kullanıcılar için portal servisi
-    └── bot-routing-fixed.yaml          # APISIX route konfigürasyonu
+├── k8s/
+│   ├── portal-svc.yaml                 # Normal kullanıcılar için portal servisi
+│   ├── portal-svc-bot.yaml             # Bot kullanıcılar için portal servisi
+│   └── bot-routing-fixed.yaml          # APISIX route konfigürasyonu
+└── scripts/
+    ├── start.sh                        # Uygulamayı başlatma script'i
+    ├── stop.sh                         # Uygulamayı kapatma script'i
+    └── test.sh                         # Test script'i
 ```
 
 ## ⚙️ Konfigürasyon Detayları
@@ -251,6 +270,40 @@ kubectl describe service portal-svc-bot
 ```
 
 ## 🚪 Uygulamayı Kapatma ve Tekrar Başlatma
+
+### 🚀 Otomatik Script'ler
+
+Proje, uygulamayı kolayca yönetmek için otomatik script'ler içerir:
+
+#### **start.sh** - Uygulamayı Başlatma
+```bash
+./scripts/start.sh
+```
+- ✅ APISIX namespace kontrolü
+- ✅ Portal servislerini başlatma
+- ✅ Pod'ların hazır olmasını bekleme
+- ✅ APISIX route'larını otomatik kurma
+- ✅ Hata kontrolü ve bilgilendirme
+
+#### **stop.sh** - Uygulamayı Kapatma
+```bash
+./scripts/stop.sh
+```
+- ✅ Port forward'ları kapatma
+- ✅ Portal servislerini silme
+- ✅ APISIX route'larını temizleme
+- ✅ Güvenli kapatma
+
+#### **test.sh** - Uygulamayı Test Etme
+```bash
+./scripts/test.sh
+```
+- ✅ Normal kullanıcı testi
+- ✅ Bot kullanıcı testi
+- ✅ Rate limit testi
+- ✅ Otomatik port forward yönetimi
+
+### 📋 Manuel Yönetim
 
 ### WSL Ubuntu'da Uygulamayı Kapatma
 
