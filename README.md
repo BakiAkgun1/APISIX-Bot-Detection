@@ -4,13 +4,13 @@ Bu proje, **APISIX API Gateway** kullanarak bot trafiğini tespit eden ve farkl�
 
 ## 🎯 Proje Özeti
 
-- **🤖 Bot Detection**: User-Agent header'ına göre bot trafiği tespiti
-- **🔄 Intelligent Routing**: Bot'lar ve normal kullanıcılar için farklı servisler
-- **⚡ Rate Limiting**: Bot'lar için kısıtlı (5 req/s), normal kullanıcılar için yüksek (50 req/s) limit
-- **☸️ Kubernetes Native**: Tamamen Kubernetes üzerinde çalışan çözüm
-- **🚦 Production Ready**: APISIX enterprise-grade API Gateway
+- ** Bot Detection**: User-Agent header'ına göre bot trafiği tespiti
+- ** Intelligent Routing**: Bot'lar ve normal kullanıcılar için farklı servisler
+- ** Rate Limiting**: Bot'lar için kısıtlı (5 req/s), normal kullanıcılar için yüksek (50 req/s) limit
+- ** Kubernetes Native**: Tamamen Kubernetes üzerinde çalışan çözüm
+- ** Production Ready**: APISIX enterprise-grade API Gateway
 
-## 🏗️ Sistem Mimarisi
+##  Sistem Mimarisi
 
 ```
 Internet → APISIX Gateway → Bot Detection → Route Decision
@@ -23,14 +23,14 @@ Internet → APISIX Gateway → Bot Detection → Route Decision
 
 **Cluster Yapısı**: 4 nodeluk Kubernetes cluster (WSL Ubuntu üzerinde)
 
-## 📋 Gereksinimler
+##  Gereksinimler
 
 - **Kubernetes Cluster** (4 nodeluk cluster ile test edildi)
 - **kubectl** CLI tool
 - **Helm 3.x**
 - **WSL2 Ubuntu** (Windows kullanıcıları için)
 
-## 🚀 Kurulum Adımları
+##  Kurulum Adımları
 
 ### 0. WSL Ubuntu Kurulumu (Windows için)
 
@@ -166,7 +166,7 @@ Request 4: HTTP 429
   RATE LIMITED!
 ```
 
-## 📁 Proje Yapısı
+##  Proje Yapısı
 
 ```
 apisix-bot-routing/
@@ -207,7 +207,7 @@ Bu regex aşağıdaki User-Agent'ları yakalar:
 - **Bot Route Priority**: 100 (yüksek öncelik)
 - **Normal Route Priority**: 50 (düşük öncelik)
 
-## 🔧 Troubleshooting
+##  Troubleshooting
 
 ### 1. Pod'lar Başlamıyor
 
@@ -246,7 +246,7 @@ kubectl describe service portal-svc
 kubectl describe service portal-svc-bot
 ```
 
-## 🧹 Temizleme
+##  Temizleme
 
 ```bash
 # APISIX'i kaldır
@@ -263,17 +263,17 @@ kubectl delete -f k8s/bot-routing-fixed.yaml
 kubectl delete namespace apisix
 ```
 
-## 🎉 Sonuç
+##  Sonuç
 
 Bu kurulum ile aşağıdaki özellikleri elde ettik:
-
+image.png 
 ✅ **Bot Detection**: User-Agent tabanlı bot tespiti  
 ✅ **Intelligent Routing**: Bot ve normal kullanıcılar için farklı servisler  
 ✅ **Rate Limiting**: Dinamik rate limiting (Bot: 5 req/s, Normal: 50 req/s)  
 ✅ **High Availability**: Kubernetes üzerinde ölçeklenebilir mimari  
 ✅ **Production Ready**: APISIX enterprise-grade API Gateway  
 
-## 🤝 Katkıda Bulunma
+##  Katkıda Bulunma
 
 1. Fork yapın
 2. Feature branch oluşturun (`git checkout -b feature/amazing-feature`)
