@@ -434,13 +434,6 @@ Bu kurulum ile aşağıdaki özellikleri elde ettik:
 ✅ **High Availability**: Kubernetes üzerinde ölçeklenebilir mimari  
 ✅ **Production Ready**: APISIX enterprise-grade API Gateway  
 
-## 🤝 Katkıda Bulunma
-
-1. Fork yapın
-2. Feature branch oluşturun (`git checkout -b feature/amazing-feature`)
-3. Commit yapın (`git commit -m 'Add amazing feature'`)
-4. Push yapın (`git push origin feature/amazing-feature`)
-5. Pull Request oluşturun
 
 ## 📄 Lisans
 
