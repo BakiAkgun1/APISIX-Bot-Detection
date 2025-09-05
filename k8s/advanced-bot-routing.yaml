@@ -17,12 +17,8 @@ spec:
       - subject:
           scope: Header
           name: X-Forwarded-For
-        op: In
-        values: 
-        - "192.168.1.100"
-        - "192.168.1.101"
-        - "10.0.0.50"
-        - "172.16.0.25"
+        op: Equal
+        value: "192.168.1.100"
     backends:
     - serviceName: portal-svc-bot
       servicePort: 80
