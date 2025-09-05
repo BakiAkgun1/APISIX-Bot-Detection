@@ -33,11 +33,19 @@ kubectl apply -f k8s/simple-jwt-routing.yaml
 echo "⏳ Route'ların aktif olması bekleniyor..."
 sleep 5
 
-# Port forward'ı kapat
-kill $PF_PID 2>/dev/null || true
-
 echo "✅ Uygulama başarıyla başlatıldı!"
+echo ""
 echo "🧪 Test etmek için:"
+echo "   # Port forward başlat"
 echo "   kubectl port-forward -n apisix service/apisix-gateway 8080:80 &"
-echo "   curl -H 'User-Agent: googlebot' http://localhost:8080"
+echo "   kubectl port-forward -n apisix service/apisix-admin 9180:9180 &"
+echo ""
+echo "   # Test komutları"
+echo "   curl -H 'User-Agent: Bot' http://localhost:8080"
+echo "   curl -H 'X-User-Role: admin' http://localhost:8080"
+echo "   curl -H 'X-Forwarded-For: 192.168.1.100' http://localhost:8080"
+echo ""
+echo "   # Tüm testleri çalıştır"
+echo "   ./scripts/test-all-routes.sh"
+echo ""
 echo "💡 Uygulamayı kapatmak için: ./scripts/stop.sh"
