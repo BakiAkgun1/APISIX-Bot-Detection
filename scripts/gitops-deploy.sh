@@ -47,3 +47,4 @@ echo "🌐 Kontrol et:"
 echo "- ArgoCD UI: https://localhost:8081"
 echo "- APISIX Gateway: http://localhost:8080"
 echo "- APISIX Admin: http://localhost:9180"
+-

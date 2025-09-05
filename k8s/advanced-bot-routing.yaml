@@ -6,7 +6,7 @@ metadata:
     kubernetes.io/ingress.class: apisix
 spec:
   http:
-  - name: ip-whitelist-traffic-1
+  - name: ip-whitelist-traffic
     priority: 200  # En yüksek priority - IP whitelist
     match:
       hosts:
@@ -17,80 +17,12 @@ spec:
       - subject:
           scope: Header
           name: X-Forwarded-For
-        op: Equal
-        value: "192.168.1.100"
-    backends:
-    - serviceName: portal-svc-bot
-      servicePort: 80
-    plugins:
-    - name: limit-count
-      enable: true
-      config:
-        count: 2
-        time_window: 60
-        key: "remote_addr"
-        rejected_code: 429
-  - name: ip-whitelist-traffic-2
-    priority: 200
-    match:
-      hosts:
-      - "*"
-      paths:
-      - "/*"
-      exprs:
-      - subject:
-          scope: Header
-          name: X-Forwarded-For
-        op: Equal
-        value: "192.168.1.101"
-    backends:
-    - serviceName: portal-svc-bot
-      servicePort: 80
-    plugins:
-    - name: limit-count
-      enable: true
-      config:
-        count: 2
-        time_window: 60
-        key: "remote_addr"
-        rejected_code: 429
-  - name: ip-whitelist-traffic-3
-    priority: 200
-    match:
-      hosts:
-      - "*"
-      paths:
-      - "/*"
-      exprs:
-      - subject:
-          scope: Header
-          name: X-Forwarded-For
-        op: Equal
-        value: "10.0.0.50"
-    backends:
-    - serviceName: portal-svc-bot
-      servicePort: 80
-    plugins:
-    - name: limit-count
-      enable: true
-      config:
-        count: 2
-        time_window: 60
-        key: "remote_addr"
-        rejected_code: 429
-  - name: ip-whitelist-traffic-4
-    priority: 200
-    match:
-      hosts:
-      - "*"
-      paths:
-      - "/*"
-      exprs:
-      - subject:
-          scope: Header
-          name: X-Forwarded-For
-        op: Equal
-        value: "172.16.0.25"
+        op: In
+        values:
+        - "192.168.1.100"
+        - "192.168.1.101"
+        - "10.0.0.50"
+        - "172.16.0.25"
     backends:
     - serviceName: portal-svc-bot
       servicePort: 80

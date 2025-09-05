@@ -17,8 +17,11 @@ spec:
       - subject:
           scope: Header
           name: X-User-Role
-        op: Equal
-        value: "admin"
+        op: In
+        values:
+        - "admin"
+        - "super_admin"
+        - "root"
     backends:
     - serviceName: portal-svc
       servicePort: 80
@@ -41,8 +44,11 @@ spec:
       - subject:
           scope: Header
           name: X-User-Type
-        op: Equal
-        value: "bot_user"
+        op: In
+        values:
+        - "bot_user"
+        - "crawler"
+        - "scraper"
     backends:
     - serviceName: portal-svc-bot
       servicePort: 80
