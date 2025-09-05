@@ -48,7 +48,7 @@ data:
         <p>Bot trafiği için özel sayfa</p>
         <p><strong>Node:</strong> <script>document.write(window.location.hostname)</script></p>
         <p><strong>Timestamp:</strong> <script>document.write(new Date())</script></p>
-        <p><strong>Rate Limit:</strong> 5 req/saniye (Bot için düşük)</p>
+        <p><strong>Rate Limit:</strong> 2 req/saniye (Bot için düşük)</p>
     </body>
     </html>
 ---

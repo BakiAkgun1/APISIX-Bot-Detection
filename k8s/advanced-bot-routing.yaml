@@ -15,32 +15,32 @@ spec:
       - "/*"
       exprs:
       - subject:
-          scope: Var
-          name: remote_addr
-        op: RegexMatch
-        value: "^(192\\.168\\.1\\.(100|101)|10\\.0\\.0\\.50|172\\.16\\.0\\.25)$"
+          scope: Header
+          name: X-Forwarded-For
+        op: Equal
+        value: "192.168.1.100"
     backends:
     - serviceName: portal-svc-bot
       servicePort: 80
     plugins:
-    - name: limit-req
+    - name: limit-count
       enable: true
       config:
-        rate: 10
-        burst: 20
+        count: 2
+        time_window: 60
         key: "remote_addr"
         rejected_code: 429
 ---
 apiVersion: apisix.apache.org/v2
 kind: ApisixRoute
 metadata:
-  name: portal-jwt-user-route
+  name: portal-ip-whitelist-route-2
   annotations:
     kubernetes.io/ingress.class: apisix
 spec:
   http:
-  - name: jwt-user-traffic
-    priority: 150  # JWT kullanıcıları için
+  - name: ip-whitelist-traffic-2
+    priority: 200  # En yüksek priority - IP whitelist
     match:
       hosts:
       - "*"
@@ -49,23 +49,183 @@ spec:
       exprs:
       - subject:
           scope: Header
-          name: Authorization
-        op: RegexMatch
-        value: "Bearer .*"
+          name: X-Forwarded-For
+        op: Equal
+        value: "192.168.1.101"
     backends:
     - serviceName: portal-svc-bot
       servicePort: 80
     plugins:
-    - name: jwt-auth
+    - name: limit-count
       enable: true
       config:
-        secret: "your-jwt-secret-key"
-        algorithm: "HS256"
-    - name: limit-req
+        count: 2
+        time_window: 60
+        key: "remote_addr"
+        rejected_code: 429
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: portal-ip-whitelist-route-3
+  annotations:
+    kubernetes.io/ingress.class: apisix
+spec:
+  http:
+  - name: ip-whitelist-traffic-3
+    priority: 200  # En yüksek priority - IP whitelist
+    match:
+      hosts:
+      - "*"
+      paths:
+      - "/*"
+      exprs:
+      - subject:
+          scope: Header
+          name: X-Forwarded-For
+        op: Equal
+        value: "10.0.0.50"
+    backends:
+    - serviceName: portal-svc-bot
+      servicePort: 80
+    plugins:
+    - name: limit-count
       enable: true
       config:
-        rate: 15
-        burst: 30
+        count: 2
+        time_window: 60
+        key: "remote_addr"
+        rejected_code: 429
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: portal-ip-whitelist-route-4
+  annotations:
+    kubernetes.io/ingress.class: apisix
+spec:
+  http:
+  - name: ip-whitelist-traffic-4
+    priority: 200  # En yüksek priority - IP whitelist
+    match:
+      hosts:
+      - "*"
+      paths:
+      - "/*"
+      exprs:
+      - subject:
+          scope: Header
+          name: X-Forwarded-For
+        op: Equal
+        value: "172.16.0.25"
+    backends:
+    - serviceName: portal-svc-bot
+      servicePort: 80
+    plugins:
+    - name: limit-count
+      enable: true
+      config:
+        count: 2
+        time_window: 60
+        key: "remote_addr"
+        rejected_code: 429
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: portal-ip-whitelist-route-5
+  annotations:
+    kubernetes.io/ingress.class: apisix
+spec:
+  http:
+  - name: ip-whitelist-traffic-5
+    priority: 200  # En yüksek priority - IP whitelist
+    match:
+      hosts:
+      - "*"
+      paths:
+      - "/*"
+      exprs:
+      - subject:
+          scope: Header
+          name: X-Forwarded-For
+        op: Equal
+        value: "192.168.1.101"
+    backends:
+    - serviceName: portal-svc-bot
+      servicePort: 80
+    plugins:
+    - name: limit-count
+      enable: true
+      config:
+        count: 2
+        time_window: 60
+        key: "remote_addr"
+        rejected_code: 429
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: portal-ip-whitelist-route-6
+  annotations:
+    kubernetes.io/ingress.class: apisix
+spec:
+  http:
+  - name: ip-whitelist-traffic-6
+    priority: 200  # En yüksek priority - IP whitelist
+    match:
+      hosts:
+      - "*"
+      paths:
+      - "/*"
+      exprs:
+      - subject:
+          scope: Header
+          name: X-Forwarded-For
+        op: Equal
+        value: "10.0.0.50"
+    backends:
+    - serviceName: portal-svc-bot
+      servicePort: 80
+    plugins:
+    - name: limit-count
+      enable: true
+      config:
+        count: 2
+        time_window: 60
+        key: "remote_addr"
+        rejected_code: 429
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: portal-ip-whitelist-route-7
+  annotations:
+    kubernetes.io/ingress.class: apisix
+spec:
+  http:
+  - name: ip-whitelist-traffic-7
+    priority: 200  # En yüksek priority - IP whitelist
+    match:
+      hosts:
+      - "*"
+      paths:
+      - "/*"
+      exprs:
+      - subject:
+          scope: Header
+          name: X-Forwarded-For
+        op: Equal
+        value: "172.16.0.25"
+    backends:
+    - serviceName: portal-svc-bot
+      servicePort: 80
+    plugins:
+    - name: limit-count
+      enable: true
+      config:
+        count: 2
+        time_window: 60
         key: "remote_addr"
         rejected_code: 429
 ---
@@ -88,17 +248,17 @@ spec:
       - subject:
           scope: Header
           name: User-Agent
-        op: RegexMatch
-        value: ".*(bot|crawler|spider|scraper|googlebot|bingbot).*"
+        op: Equal
+        value: "Bot"
     backends:
     - serviceName: portal-svc-bot
       servicePort: 80
     plugins:
-    - name: limit-req
+    - name: limit-count
       enable: true
       config:
-        rate: 5
-        burst: 10
+        count: 2
+        time_window: 60
         key: "remote_addr"
         rejected_code: 429
 ---
@@ -121,10 +281,10 @@ spec:
     - serviceName: portal-svc
       servicePort: 80
     plugins:
-    - name: limit-req
+    - name: limit-count
       enable: true
       config:
-        rate: 50
-        burst: 100
+        count: 10
+        time_window: 60
         key: "remote_addr"
         rejected_code: 429

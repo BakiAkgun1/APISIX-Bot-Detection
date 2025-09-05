@@ -1,23 +1,24 @@
-# 🤖 APISIX Gelişmiş Bot Routing Sistemi
+#  APISIX Gelişmiş Bot Routing Sistemi
 
-IP listesi ve JWT token ile kullanıcıları bot servisine yönlendiren akıllı routing sistemi.
+IP listesi, JWT token ve username ile kullanıcıları bot servisine yönlendiren akıllı routing sistemi.
 
-## 🎯 Özellikler
+##  Özellikler
 
-- **IP Whitelist Routing**: Belirli IP'lerden gelen istekler bot servisine
+- **IP Whitelist Routing**: 4 farklı IP'den gelen istekler bot servisine
 - **JWT Header Routing**: `X-User-Type: bot_user` ve `X-User-Role: admin` ile yönlendirme
-- **Bot User-Agent Detection**: Otomatik bot tespiti
+- **Username Routing**: `X-Username: testuser` ile bot servisine yönlendirme
+- **Bot User-Agent Detection**: `User-Agent: Bot` ile otomatik bot tespiti
 - **Priority System**: Yüksek priority'li route'lar önce kontrol edilir
-- **Rate Limiting**: Her kullanıcı türü için farklı limitler
+- **Rate Limiting**: Bot kullanıcıları 2 req/min, Normal kullanıcılar 10 req/min
 
-## 📋 Gereksinimler
+##  Gereksinimler
 
 - **Kubernetes Cluster** (4 nodeluk cluster ile test edildi)
 - **kubectl** CLI tool
 - **Helm 3.x**
 - **WSL2 Ubuntu** (Windows kullanıcıları için)
 
-## 🚀 Kurulum Adımları
+##  Kurulum Adımları
 
 ### 1. WSL Ubuntu Kurulumu (Windows için)
 
@@ -112,20 +113,20 @@ curl http://localhost:8080
 ```html
 🌟 Portal Ana Sayfa
 Hoşgeldiniz! Bu normal kullanıcılar için portal sayfası.
-Rate Limit: 50 req/saniye
+Rate Limit: 10 req/saniye (Normal kullanıcılar için yüksek)
 ```
 
 ### 2. Bot Kullanıcı Testi
 
 ```bash
-curl -H "User-Agent: googlebot" http://localhost:8080
+curl -H "User-Agent: Bot" http://localhost:8080
 ```
 
 **Beklenen Çıktı:**
 ```html
 🤖 Portal Bot Sayfası
 Bot trafiği için özel sayfa
-Rate Limit: 5 req/saniye (Bot için düşük)
+Rate Limit: 2 req/saniye (Bot için düşük)
 ```
 
 ### 3. JWT Header Testleri
@@ -137,19 +138,30 @@ curl -H "X-User-Type: bot_user" http://localhost:8080
 # Admin User Test
 curl -H "X-User-Role: admin" http://localhost:8080
 
-# IP Whitelist Test
-curl -H "X-Forwarded-For: 192.168.1.100" http://localhost:8080
+# Username Routing Test
+curl -H "X-Username: testuser" http://localhost:8080
 ```
 
-## 📊 Priority Sıralaması
+### 4. IP Whitelist Testleri
 
-1. **Priority 200**: IP Whitelist → Bot servisi
+```bash
+# 4 farklı IP testi
+curl -H "X-Forwarded-For: 192.168.1.100" http://localhost:8080
+curl -H "X-Forwarded-For: 192.168.1.101" http://localhost:8080
+curl -H "X-Forwarded-For: 10.0.0.50" http://localhost:8080
+curl -H "X-Forwarded-For: 172.16.0.25" http://localhost:8080
+```
+
+##  Priority Sıralaması
+
+1. **Priority 200**: IP Whitelist (4 IP) → Bot servisi
 2. **Priority 170**: JWT Bot Users → Bot servisi
-3. **Priority 160**: JWT Admin Users → Normal servis
-4. **Priority 100**: Bot User-Agent → Bot servisi
-5. **Priority 50**: Normal Users → Normal servis
+3. **Priority 100**: Bot User-Agent → Bot servisi
+4. **Priority 80**: JWT Admin Users → Normal servis
+5. **Priority 70**: Username Routing → Bot servisi
+6. **Priority 50**: Normal Users → Normal servis
 
-## 🔧 Manuel Route Ekleme
+##  Manuel Route Ekleme
 
 Eğer otomatik route'lar çalışmazsa manuel olarak ekleyebilirsin:
 
@@ -183,11 +195,12 @@ curl -X PUT -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
 
 | Traffic Type | Rate Limit | Burst | Target Service | Priority |
 |--------------|------------|-------|----------------|----------|
-| IP Whitelist | 10 req/s | 20 | portal-svc-bot | 200 |
-| JWT Bot Users | 15 req/s | 30 | portal-svc-bot | 170 |
-| JWT Admin | 25 req/s | 50 | portal-svc | 160 |
-| Bot User-Agent | 5 req/s | 10 | portal-svc-bot | 100 |
-| Normal Traffic | 50 req/s | 100 | portal-svc | 50 |
+| IP Whitelist (4 IP) | 2 req/min | 4 | portal-svc-bot | 200 |
+| JWT Bot Users | 2 req/min | 4 | portal-svc-bot | 170 |
+| Bot User-Agent | 2 req/min | 4 | portal-svc-bot | 100 |
+| Username Routing | 2 req/min | 4 | portal-svc-bot | 70 |
+| JWT Admin | 10 req/min | 20 | portal-svc | 80 |
+| Normal Traffic | 10 req/min | 20 | portal-svc | 50 |
 
 ## ⚠️ Priority Eşitse
 
@@ -195,6 +208,43 @@ Aynı priority değerine sahip route'lar varsa:
 - **İlk eklenen route öncelik alır** (FIFO)
 - Route'ların sırası önemli
 - Daha spesifik match'ler önce kontrol edilir
+
+## 🚀 Hızlı Başlangıç
+
+### 1. Sistemi Başlat
+```bash
+# Tüm sistemi otomatik başlat
+./scripts/start.sh
+```
+
+### 2. Port Forward'ları Başlat
+```bash
+# Terminal 1'de (Gateway)
+kubectl port-forward -n apisix service/apisix-gateway 8080:80 &
+
+# Terminal 2'de (Admin API)
+kubectl port-forward -n apisix service/apisix-admin 9180:9180 &
+```
+
+### 3. Test Et
+```bash
+# Normal kullanıcı
+curl http://localhost:8080
+
+# Bot kullanıcı
+curl -H "User-Agent: Bot" http://localhost:8080
+
+# JWT Admin
+curl -H "X-User-Role: admin" http://localhost:8080
+
+# IP Whitelist
+curl -H "X-Forwarded-For: 192.168.1.100" http://localhost:8080
+```
+
+### 4. Sistemi Kapat
+```bash
+./scripts/stop.sh
+```
 
 ## 🚪 Otomatik Script'ler
 
@@ -284,8 +334,24 @@ curl http://localhost:8080
 ```
 
 ### Beklenen Sonuçlar:
-- **Bot Sayfası:** Kırmızı arka plan, "🤖 Portal Bot Sayfası"
-- **Normal Sayfa:** Yeşil arka plan, "🌟 Portal Ana Sayfa"
+- **Bot Sayfası:** Kırmızı arka plan, "🤖 Portal Bot Sayfası", Rate Limit: 2 req/saniye
+- **Normal Sayfa:** Yeşil arka plan, "🌟 Portal Ana Sayfa", Rate Limit: 10 req/saniye
+
+## 📋 Özet
+
+### ✅ Çalışan Özellikler:
+- **IP Whitelist Routing**: 4 farklı IP (192.168.1.100, 192.168.1.101, 10.0.0.50, 172.16.0.25)
+- **JWT Header Routing**: X-User-Type: bot_user, X-User-Role: admin
+- **Username Routing**: X-Username: testuser
+- **Bot User-Agent Detection**: User-Agent: Bot
+- **Rate Limiting**: Bot 2 req/min, Normal 10 req/min
+- **Priority System**: 200 → 170 → 100 → 80 → 70 → 50
+
+### 🚀 Kullanım:
+1. `./scripts/start.sh` - Sistemi başlat
+2. Port forward'ları başlat
+3. Test et
+4. `./scripts/stop.sh` - Sistemi kapat
 
 ## 🧹 Temizleme
 
