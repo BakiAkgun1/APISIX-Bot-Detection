@@ -235,13 +235,26 @@ curl -H "X-Forwarded-For: 192.168.1.100" http://localhost:8080
 # 1. ArgoCD kur
 ./scripts/install-argocd.sh
 
-# 2. ArgoCD CLI kur
+# 2. ArgoCD CLI kur (WSL'de)
 ./scripts/install-argocd-cli.sh
 
-# 3. GitOps deployment
-./scripts/gitops-deploy.sh
+# 3. ArgoCD'ye login ol (WSL'de)
+argocd login localhost:8081
+# Username: admin
+# Password: Kurulum script'inden alınan şifre
 
-# 4. ArgoCD UI'da kontrol et
+# 4. Application oluştur (WSL'de)
+argocd app create apisix-bot-routing \
+  --repo https://github.com/BakiAkgun1/APISIX-Bot-Detection.git \
+  --path k8s \
+  --dest-server https://kubernetes.default.svc \
+  --dest-namespace default \
+  --sync-policy automated
+
+# 5. Sync et (WSL'de)
+argocd app sync apisix-bot-routing
+
+# 6. ArgoCD UI'da kontrol et
 # https://localhost:8081 (admin + şifre)
 ```
 
@@ -317,7 +330,7 @@ apisix-bot-routing/
 │   ├── portal-svc-bot.yaml             # Bot kullanıcılar için portal
 │   ├── advanced-bot-routing.yaml       # Gelişmiş routing konfigürasyonu
 │   ├── simple-jwt-routing.yaml         # JWT routing konfigürasyonu
-│   └── bot-routing-fixed.yaml          # Eski routing (silindi)
+│   └── argocd-application.yaml         # ArgoCD Application tanımı
 └── scripts/
     ├── start.sh                        # Uygulamayı başlatma
     ├── stop.sh                         # Uygulamayı kapatma
@@ -446,18 +459,35 @@ done
 ## 📋 Özet
 
 ### ✅ Çalışan Özellikler:
-- **IP Whitelist Routing**: 4 farklı IP (192.168.1.100, 192.168.1.101, 10.0.0.50, 172.16.0.25)
-- **JWT Header Routing**: X-User-Type: bot_user, X-User-Role: admin
-- **Username Routing**: X-Username: testuser
+- **IP Whitelist Routing**: 4 farklı IP (192.168.1.100, 192.168.1.101, 10.0.0.50, 172.16.0.25) - Tek route'da values array
+- **JWT Header Routing**: X-User-Type: bot_user, X-User-Role: admin - Values array ile optimize
+- **Username Routing**: X-Username: testuser - Values array ile genişletilebilir
 - **Bot User-Agent Detection**: User-Agent: Bot
 - **Rate Limiting**: Bot 2 req/min, Normal 10 req/min
 - **Priority System**: 200 → 170 → 100 → 80 → 70 → 50
+- **ArgoCD GitOps**: Otomatik deployment ve sync
+- **Optimize Route'lar**: 7 route → 3 route (values array kullanımı)
 
 ### 🚀 Kullanım:
+
+#### **Manuel Deployment:**
 1. `./scripts/start.sh` - Sistemi başlat
 2. Port forward'ları başlat
 3. Test et
-4. `./scripts/stop.sh` - Sistemi kapat
+
+#### **GitOps ile ArgoCD:**
+1. `./scripts/install-argocd.sh` - ArgoCD kur
+2. `./scripts/install-argocd-cli.sh` - CLI kur
+3. `argocd app create` - Application oluştur
+4. `argocd app sync` - Sync et
+5. ArgoCD UI'da kontrol et
+
+### 🎯 Son Durum:
+- ✅ **Route'lar optimize edildi** (values array)
+- ✅ **ArgoCD entegrasyonu** hazır
+- ✅ **GitOps workflow** çalışıyor
+- ✅ **Tüm testler** hazır
+- ✅ **Dokümantasyon** güncel
 
 ## 🧹 Temizleme
 
