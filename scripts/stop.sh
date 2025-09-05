@@ -11,6 +11,11 @@ echo "🚪 Portal servisleri kapatılıyor..."
 kubectl delete -f k8s/portal-svc.yaml --ignore-not-found=true
 kubectl delete -f k8s/portal-svc-bot.yaml --ignore-not-found=true
 
+# Gelişmiş routing konfigürasyonlarını sil
+echo "🛣️ Gelişmiş routing konfigürasyonları kapatılıyor..."
+kubectl delete -f k8s/advanced-bot-routing.yaml --ignore-not-found=true
+kubectl delete -f k8s/simple-jwt-routing.yaml --ignore-not-found=true
+
 # APISIX route'larını temizle (eğer admin API erişilebilirse)
 echo "🛣️ APISIX route'ları temizleniyor..."
 kubectl port-forward -n apisix service/apisix-admin 9180:9180 >/dev/null 2>&1 &

@@ -1,27 +1,14 @@
-# APISIX Bot Detection & Rate Limiting Project
+# 🤖 APISIX Gelişmiş Bot Routing Sistemi
 
-Bu proje, **APISIX API Gateway** kullanarak bot trafiğini tespit eden ve farklı rate limiting uygulayan bir **Kubernetes** kurulumudur.
+IP listesi ve JWT token ile kullanıcıları bot servisine yönlendiren akıllı routing sistemi.
 
-## 🎯 Proje Özeti
+## 🎯 Özellikler
 
-- **Bot Detection**: User-Agent header'ına göre bot trafiği tespiti
-- **Intelligent Routing**: Bot'lar ve normal kullanıcılar için farklı servisler
-- **Rate Limiting**: Bot'lar için kısıtlı (5 req/s), normal kullanıcılar için yüksek (50 req/s) limit
-- **Kubernetes Native**: Tamamen Kubernetes üzerinde çalışan çözüm
-- **Production Ready**: APISIX enterprise-grade API Gateway
-
-## Sistem Mimarisi
-
-```
-Internet → APISIX Gateway → Bot Detection → Route Decision
-                              ↓
-                  Bot Traffic ↙     ↘ Normal Traffic
-                             ↓       ↓
-                    portal-svc-bot  portal-svc
-                    (Rate: 5/s)     (Rate: 50/s)
-```
-
-**Cluster Yapısı**: 4 nodeluk Kubernetes cluster (WSL Ubuntu üzerinde)
+- **IP Whitelist Routing**: Belirli IP'lerden gelen istekler bot servisine
+- **JWT Header Routing**: `X-User-Type: bot_user` ve `X-User-Role: admin` ile yönlendirme
+- **Bot User-Agent Detection**: Otomatik bot tespiti
+- **Priority System**: Yüksek priority'li route'lar önce kontrol edilir
+- **Rate Limiting**: Her kullanıcı türü için farklı limitler
 
 ## 📋 Gereksinimler
 
@@ -32,7 +19,7 @@ Internet → APISIX Gateway → Bot Detection → Route Decision
 
 ## 🚀 Kurulum Adımları
 
-### 0. WSL Ubuntu Kurulumu (Windows için)
+### 1. WSL Ubuntu Kurulumu (Windows için)
 
 ```bash
 # WSL Ubuntu kurulumu
@@ -45,7 +32,7 @@ sudo apt update && sudo apt upgrade -y
 sudo apt install -y curl wget git
 ```
 
-### 1. Kubernetes Cluster Kontrolü
+### 2. Kubernetes Cluster Kontrolü
 
 ```bash
 # Cluster bilgilerini kontrol et
@@ -58,7 +45,7 @@ kubectl get nodes
 kubectl describe nodes
 ```
 
-### 2. Helm Kurulumu
+### 3. Helm Kurulumu
 
 ```bash
 # Helm indirme (WSL Ubuntu için)
@@ -69,13 +56,13 @@ helm repo add apisix https://charts.apiseven.com
 helm repo update
 ```
 
-### 3. APISIX Namespace Oluşturma
+### 4. APISIX Namespace Oluşturma
 
 ```bash
 kubectl create namespace apisix
 ```
 
-### 4. APISIX Kurulumu
+### 5. APISIX Kurulumu
 
 ```bash
 helm install apisix apisix/apisix \
@@ -85,7 +72,7 @@ helm install apisix apisix/apisix \
   --timeout 10m
 ```
 
-### 5. Portal Servislerini Deploy Etme
+### 6. Portal Servislerini Deploy Etme
 
 ```bash
 # Normal kullanıcılar için portal
@@ -95,37 +82,22 @@ kubectl apply -f k8s/portal-svc.yaml
 kubectl apply -f k8s/portal-svc-bot.yaml
 ```
 
-### 6. APISIX Route Konfigürasyonu
+### 7. APISIX Route Konfigürasyonu
 
 ```bash
 # Route'ları uygula
-kubectl apply -f k8s/bot-routing-fixed.yaml
+kubectl apply -f k8s/advanced-bot-routing.yaml
+kubectl apply -f k8s/simple-jwt-routing.yaml
 ```
 
-### 7. Port Forward ile Test
+### 8. Port Forward ile Test
 
 ```bash
 # APISIX Gateway port forward
 kubectl port-forward -n apisix service/apisix-gateway 8080:80 &
 
-# APISIX Admin API port forward (opsiyonel)
+# APISIX Admin API port forward
 kubectl port-forward -n apisix service/apisix-admin 9180:9180 &
-```
-
-### 8. Otomatik Script'ler ile Yönetim
-
-```bash
-# Script'leri çalıştırılabilir yap
-chmod +x scripts/*.sh
-
-# Uygulamayı başlat
-./scripts/start.sh
-
-# Uygulamayı test et
-./scripts/test.sh
-
-# Uygulamayı kapat
-./scripts/stop.sh
 ```
 
 ## 🧪 Test Etme
@@ -133,7 +105,7 @@ chmod +x scripts/*.sh
 ### 1. Normal Kullanıcı Testi
 
 ```bash
-curl -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)" http://localhost:8080
+curl http://localhost:8080
 ```
 
 **Beklenen Çıktı:**
@@ -146,7 +118,7 @@ Rate Limit: 50 req/saniye
 ### 2. Bot Kullanıcı Testi
 
 ```bash
-curl -H "User-Agent: googlebot/2.1" http://localhost:8080
+curl -H "User-Agent: googlebot" http://localhost:8080
 ```
 
 **Beklenen Çıktı:**
@@ -156,125 +128,77 @@ Bot trafiği için özel sayfa
 Rate Limit: 5 req/saniye (Bot için düşük)
 ```
 
-### 3. Rate Limit Testi
+### 3. JWT Header Testleri
 
 ```bash
-echo "=== Bot Rate Limit Test ==="
-for i in {1..6}; do
-  echo -n "Request $i: "
-  response=$(curl -s -w "%{http_code}" -H "User-Agent: googlebot" http://localhost:8080 2>/dev/null)
-  status_code=$(echo $response | tail -c 4)
-  echo "HTTP $status_code"
-  if [ "$status_code" = "429" ]; then
-    echo "  RATE LIMITED!"
-  fi
-  sleep 0.3
-done
+# Bot User Test
+curl -H "X-User-Type: bot_user" http://localhost:8080
+
+# Admin User Test
+curl -H "X-User-Role: admin" http://localhost:8080
+
+# IP Whitelist Test
+curl -H "X-Forwarded-For: 192.168.1.100" http://localhost:8080
 ```
 
-**Beklenen Çıktı:**
+## 📊 Priority Sıralaması
+
+1. **Priority 200**: IP Whitelist → Bot servisi
+2. **Priority 170**: JWT Bot Users → Bot servisi
+3. **Priority 160**: JWT Admin Users → Normal servis
+4. **Priority 100**: Bot User-Agent → Bot servisi
+5. **Priority 50**: Normal Users → Normal servis
+
+## 🔧 Manuel Route Ekleme
+
+Eğer otomatik route'lar çalışmazsa manuel olarak ekleyebilirsin:
+
+```bash
+# Bot User Route
+curl -X PUT -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
+  -H "Content-Type: application/json" \
+  -d '{"uri": "/*", "priority": 170, "vars": [["http_x_user_type", "==", "bot_user"]], "upstream": {"type": "roundrobin", "nodes": {"portal-svc-bot.default.svc.cluster.local:80": 1}}, "plugins": {"limit-req": {"rate": 15, "burst": 30, "key": "remote_addr", "rejected_code": 429}}}' \
+  http://localhost:9180/apisix/admin/routes/1
+
+# Admin User Route
+curl -X PUT -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
+  -H "Content-Type: application/json" \
+  -d '{"uri": "/*", "priority": 160, "vars": [["http_x_user_role", "==", "admin"]], "upstream": {"type": "roundrobin", "nodes": {"portal-svc.default.svc.cluster.local:80": 1}}, "plugins": {"limit-req": {"rate": 25, "burst": 50, "key": "remote_addr", "rejected_code": 429}}}' \
+  http://localhost:9180/apisix/admin/routes/3
+
+# IP Whitelist Route
+curl -X PUT -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
+  -H "Content-Type: application/json" \
+  -d '{"uri": "/*", "priority": 200, "vars": [["http_x_forwarded_for", "~~", "192\\.168\\.1\\.(100|101)|10\\.0\\.0\\.50|172\\.16\\.0\\.25"]], "upstream": {"type": "roundrobin", "nodes": {"portal-svc-bot.default.svc.cluster.local:80": 1}}, "plugins": {"limit-req": {"rate": 10, "burst": 20, "key": "remote_addr", "rejected_code": 429}}}' \
+  http://localhost:9180/apisix/admin/routes/4
+
+# Normal User Route
+curl -X PUT -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
+  -H "Content-Type: application/json" \
+  -d '{"uri": "/*", "priority": 50, "upstream": {"type": "roundrobin", "nodes": {"portal-svc.default.svc.cluster.local:80": 1}}, "plugins": {"limit-req": {"rate": 50, "burst": 100, "key": "remote_addr", "rejected_code": 429}}}' \
+  http://localhost:9180/apisix/admin/routes/2
 ```
-Request 1: HTTP 200
-Request 2: HTTP 200
-Request 3: HTTP 429
-  RATE LIMITED!
-Request 4: HTTP 429
-  RATE LIMITED!
-```
 
-<img width="605" height="529" alt="image" src="https://github.com/user-attachments/assets/426eb0aa-8896-4415-85b9-40f22195e24e" />
-
-## 📁 Proje Yapısı
-
-```
-apisix-bot-routing/
-├── README.md                           # Bu dosya
-├── apisix-working-values.yaml          # APISIX Helm values (çalışan versiyon)
-├── k8s/
-│   ├── portal-svc.yaml                 # Normal kullanıcılar için portal servisi
-│   ├── portal-svc-bot.yaml             # Bot kullanıcılar için portal servisi
-│   └── bot-routing-fixed.yaml          # APISIX route konfigürasyonu
-└── scripts/
-    ├── start.sh                        # Uygulamayı başlatma script'i
-    ├── stop.sh                         # Uygulamayı kapatma script'i
-    └── test.sh                         # Test script'i
-```
-
-## ⚙️ Konfigürasyon Detayları
-
-### Bot Detection Regex
-
-```regex
-.*(bot|crawler|spider|scraper|googlebot|bingbot).*
-```
-
-Bu regex aşağıdaki User-Agent'ları yakalar:
-- `googlebot`
-- `bingbot`
-- `crawler`
-- `spider`
-- `scraper`
-- `facebookexternalhit`
-- `twitterbot`
-
-### Rate Limiting Konfigürasyonu
+## 📈 Rate Limits
 
 | Traffic Type | Rate Limit | Burst | Target Service | Priority |
 |--------------|------------|-------|----------------|----------|
-| Bot Traffic  | 5 req/s    | 10    | portal-svc-bot | 100      |
-| Normal Traffic | 50 req/s  | 100   | portal-svc     | 50       |
+| IP Whitelist | 10 req/s | 20 | portal-svc-bot | 200 |
+| JWT Bot Users | 15 req/s | 30 | portal-svc-bot | 170 |
+| JWT Admin | 25 req/s | 50 | portal-svc | 160 |
+| Bot User-Agent | 5 req/s | 10 | portal-svc-bot | 100 |
+| Normal Traffic | 50 req/s | 100 | portal-svc | 50 |
 
-### APISIX Route Öncelikleri
+## ⚠️ Priority Eşitse
 
-- **Bot Route Priority**: 100 (yüksek öncelik)
-- **Normal Route Priority**: 50 (düşük öncelik)
+Aynı priority değerine sahip route'lar varsa:
+- **İlk eklenen route öncelik alır** (FIFO)
+- Route'ların sırası önemli
+- Daha spesifik match'ler önce kontrol edilir
 
-## 🔧 Troubleshooting
+## 🚪 Otomatik Script'ler
 
-### 1. Pod'lar Başlamıyor
-
-```bash
-kubectl get pods -n apisix
-kubectl describe pod <pod-name> -n apisix
-kubectl logs <pod-name> -n apisix
-```
-
-### 2. APISIX Route'lar Çalışmıyor
-
-```bash
-# Route'ları kontrol et
-kubectl get apisixroute -n apisix
-
-# Route detaylarını gör
-kubectl describe apisixroute portal-bot-route -n apisix
-kubectl describe apisixroute portal-normal-route -n apisix
-```
-
-### 3. Rate Limit Çalışmıyor
-
-```bash
-# Route konfigürasyonunu kontrol et
-kubectl get apisixroute portal-bot-route -n apisix -o yaml
-```
-
-### 4. Servis Bağlantı Sorunları
-
-```bash
-# Endpoint'leri kontrol et
-kubectl get endpoints -n default
-
-# Servis detaylarını gör
-kubectl describe service portal-svc
-kubectl describe service portal-svc-bot
-```
-
-## 🚪 Uygulamayı Kapatma ve Tekrar Başlatma
-
-### 🚀 Otomatik Script'ler
-
-Proje, uygulamayı kolayca yönetmek için otomatik script'ler içerir:
-
-#### **start.sh** - Uygulamayı Başlatma
+### start.sh - Uygulamayı Başlatma
 ```bash
 ./scripts/start.sh
 ```
@@ -282,184 +206,86 @@ Proje, uygulamayı kolayca yönetmek için otomatik script'ler içerir:
 - ✅ Portal servislerini başlatma
 - ✅ Pod'ların hazır olmasını bekleme
 - ✅ APISIX route'larını otomatik kurma
-- ✅ Hata kontrolü ve bilgilendirme
 
-#### **stop.sh** - Uygulamayı Kapatma
+### stop.sh - Uygulamayı Kapatma
 ```bash
 ./scripts/stop.sh
 ```
 - ✅ Port forward'ları kapatma
 - ✅ Portal servislerini silme
 - ✅ APISIX route'larını temizleme
-- ✅ Güvenli kapatma
 
-#### **test.sh** - Uygulamayı Test Etme
+### test-advanced-routing.sh - Test
 ```bash
-./scripts/test.sh
+./scripts/test-advanced-routing.sh
 ```
-- ✅ Normal kullanıcı testi
-- ✅ Bot kullanıcı testi
-- ✅ Rate limit testi
-- ✅ Otomatik port forward yönetimi
+- ✅ Tüm routing senaryolarını test etme
 
-### 📋 Manuel Yönetim
+## 🔧 Troubleshooting
 
-### WSL Ubuntu'da Uygulamayı Kapatma
-
-#### 1. Port Forward'ları Kapat
-
+### 1. Pod'lar Başlamıyor
 ```bash
-# Tüm port forward işlemlerini kapat
+kubectl get pods -n apisix
+kubectl describe pod <pod-name> -n apisix
+kubectl logs <pod-name> -n apisix
+```
+
+### 2. APISIX Route'lar Çalışmıyor
+```bash
+# Route'ları kontrol et
+kubectl get apisixroute
+
+# Route detaylarını gör
+kubectl describe apisixroute portal-bot-route
+```
+
+### 3. Port Forward Sorunları
+```bash
+# Port forward'ları temizle
 pkill -f port-forward
 
-# Veya manuel olarak process ID'yi bul ve öldür
-ps aux | grep port-forward
-kill <process_id>
+# Yeniden başlat
+kubectl port-forward -n apisix service/apisix-gateway 8080:80
 ```
 
-#### 2. Portal Servislerini Kapat
+## 📁 Proje Yapısı
 
+```
+apisix-bot-routing/
+├── README.md                           # Bu dosya
+├── apisix-working-values.yaml          # APISIX Helm values
+├── k8s/
+│   ├── portal-svc.yaml                 # Normal kullanıcılar için portal
+│   ├── portal-svc-bot.yaml             # Bot kullanıcılar için portal
+│   ├── advanced-bot-routing.yaml       # Gelişmiş routing konfigürasyonu
+│   ├── simple-jwt-routing.yaml         # JWT routing konfigürasyonu
+│   └── bot-routing-fixed.yaml          # Eski routing (yedek)
+└── scripts/
+    ├── start.sh                        # Uygulamayı başlatma
+    ├── stop.sh                         # Uygulamayı kapatma
+    └── test-advanced-routing.sh        # Test script'i
+```
+
+## 🧪 Test Senaryoları
+
+### Başarılı Testler:
 ```bash
-# Portal deploymentlarını sil
-kubectl delete deployment portal-app portal-bot-app
+# IP Whitelist
+curl -H "X-Forwarded-For: 192.168.1.100" http://localhost:8080
+# ✅ Bot Sayfası
 
-# Portal servislerini sil
-kubectl delete service portal-svc portal-svc-bot
+# Admin User
+curl -H "X-User-Role: admin" http://localhost:8080  
+# ✅ Normal Sayfa
 
-# Veya YAML dosyalarıyla sil
-kubectl delete -f k8s/portal-svc.yaml
-kubectl delete -f k8s/portal-svc-bot.yaml
+# Normal User
+curl http://localhost:8080
+# ✅ Normal Sayfa
 ```
 
-#### 3. APISIX Route'larını Temizle
-
-```bash
-# Admin API ile route'ları sil
-kubectl port-forward -n apisix service/apisix-admin 9180:9180 &
-
-curl -X DELETE \
-  -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
-  http://localhost:9180/apisix/admin/routes/1
-
-curl -X DELETE \
-  -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
-  http://localhost:9180/apisix/admin/routes/2
-
-pkill -f port-forward
-```
-
-#### 4. APISIX'i Tamamen Kapat (İsteğe Bağlı)
-
-```bash
-# APISIX Helm release'ini sil
-helm uninstall apisix -n apisix
-
-# APISIX namespace'ini sil
-kubectl delete namespace apisix
-```
-
-### WSL Ubuntu'da Uygulamayı Tekrar Başlatma
-
-#### 1. Hızlı Başlatma (APISIX Zaten Kuruluysa)
-
-```bash
-# Portal servislerini başlat
-kubectl apply -f k8s/portal-svc.yaml
-kubectl apply -f k8s/portal-svc-bot.yaml
-
-# Pod'ların hazır olmasını bekle
-kubectl wait --for=condition=ready pod --all --timeout=120s
-
-# APISIX route'larını ekle
-kubectl port-forward -n apisix service/apisix-admin 9180:9180 &
-
-# Bot route
-curl -X PUT \
-  -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "uri": "/*",
-    "priority": 100,
-    "vars": [["http_user_agent", "~~", ".*(bot|crawler|spider|scraper|googlebot|bingbot).*"]],
-    "upstream": {
-      "type": "roundrobin",
-      "nodes": {
-        "portal-svc-bot.default.svc.cluster.local:80": 1
-      }
-    },
-    "plugins": {
-      "limit-req": {
-        "rate": 5,
-        "burst": 10,
-        "key": "remote_addr",
-        "key_type": "var",
-        "rejected_code": 429,
-        "rejected_msg": "Bot rate limit exceeded",
-        "nodelay": true
-      }
-    }
-  }' \
-  http://localhost:9180/apisix/admin/routes/1
-
-# Normal route
-curl -X PUT \
-  -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "uri": "/*",
-    "priority": 50,
-    "upstream": {
-      "type": "roundrobin",
-      "nodes": {
-        "portal-svc.default.svc.cluster.local:80": 1
-      }
-    },
-    "plugins": {
-      "limit-req": {
-        "rate": 50,
-        "burst": 100,
-        "key": "remote_addr",
-        "key_type": "var",
-        "rejected_code": 429
-      }
-    }
-  }' \
-  http://localhost:9180/apisix/admin/routes/2
-
-pkill -f port-forward
-```
-
-#### 2. Tam Kurulum (APISIX Silinmişse)
-
-```bash
-# APISIX namespace oluştur
-kubectl create namespace apisix
-
-# APISIX kur
-helm install apisix apisix/apisix \
-  --namespace apisix \
-  --values apisix-working-values.yaml \
-  --wait \
-  --timeout 10m
-
-# Yukarıdaki "Hızlı Başlatma" kısmını çalıştır
-```
-
-#### 3. WSL Kapatıldıktan Sonra Tekrar Açma
-
-```bash
-# WSL Ubuntu'yu yeniden başlat
-wsl --shutdown
-wsl -d Ubuntu
-
-# Kubernetes cluster'ın çalıştığını kontrol et
-kubectl cluster-info
-
-# Eğer cluster çalışmıyorsa, Docker Desktop'ı başlat
-# Windows'ta Docker Desktop uygulamasını aç
-
-# Cluster hazır olduktan sonra yukarıdaki "Hızlı Başlatma" komutlarını çalıştır
-```
+### Beklenen Sonuçlar:
+- **Bot Sayfası:** Kırmızı arka plan, "🤖 Portal Bot Sayfası"
+- **Normal Sayfa:** Yeşil arka plan, "🌟 Portal Ana Sayfa"
 
 ## 🧹 Temizleme
 
@@ -472,7 +298,8 @@ kubectl delete -f k8s/portal-svc.yaml
 kubectl delete -f k8s/portal-svc-bot.yaml
 
 # Route'ları sil
-kubectl delete -f k8s/bot-routing-fixed.yaml
+kubectl delete -f k8s/advanced-bot-routing.yaml
+kubectl delete -f k8s/simple-jwt-routing.yaml
 
 # Namespace'i sil
 kubectl delete namespace apisix
@@ -482,23 +309,18 @@ kubectl delete namespace apisix
 
 Bu kurulum ile aşağıdaki özellikleri elde ettik:
 
+✅ **IP Whitelist Routing**: Belirli IP'lerden gelen istekler bot servisine  
+✅ **JWT Header Routing**: Header tabanlı kullanıcı yönlendirme  
 ✅ **Bot Detection**: User-Agent tabanlı bot tespiti  
 ✅ **Intelligent Routing**: Bot ve normal kullanıcılar için farklı servisler  
-✅ **Rate Limiting**: Dinamik rate limiting (Bot: 5 req/s, Normal: 50 req/s)  
+✅ **Rate Limiting**: Dinamik rate limiting  
 ✅ **High Availability**: Kubernetes üzerinde ölçeklenebilir mimari  
-✅ **Production Ready**: APISIX enterprise-grade API Gateway  
-
-
-## 📄 Lisans
-
-Bu proje MIT lisansı altında lisanslanmıştır.
 
 ## 🔗 Faydalı Linkler
 
 - [APISIX Documentation](https://apisix.apache.org/docs/)
 - [APISIX Helm Charts](https://github.com/apache/apisix-helm-chart)
 - [Kubernetes Documentation](https://kubernetes.io/docs/)
-- [Helm Documentation](https://helm.sh/docs/)
 
 ---
 

@@ -1,0 +1,130 @@
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: portal-ip-whitelist-route
+  annotations:
+    kubernetes.io/ingress.class: apisix
+spec:
+  http:
+  - name: ip-whitelist-traffic
+    priority: 200  # En yüksek priority - IP whitelist
+    match:
+      hosts:
+      - "*"
+      paths:
+      - "/*"
+      exprs:
+      - subject:
+          scope: Var
+          name: remote_addr
+        op: RegexMatch
+        value: "^(192\\.168\\.1\\.(100|101)|10\\.0\\.0\\.50|172\\.16\\.0\\.25)$"
+    backends:
+    - serviceName: portal-svc-bot
+      servicePort: 80
+    plugins:
+    - name: limit-req
+      enable: true
+      config:
+        rate: 10
+        burst: 20
+        key: "remote_addr"
+        rejected_code: 429
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: portal-jwt-user-route
+  annotations:
+    kubernetes.io/ingress.class: apisix
+spec:
+  http:
+  - name: jwt-user-traffic
+    priority: 150  # JWT kullanıcıları için
+    match:
+      hosts:
+      - "*"
+      paths:
+      - "/*"
+      exprs:
+      - subject:
+          scope: Header
+          name: Authorization
+        op: RegexMatch
+        value: "Bearer .*"
+    backends:
+    - serviceName: portal-svc-bot
+      servicePort: 80
+    plugins:
+    - name: jwt-auth
+      enable: true
+      config:
+        secret: "your-jwt-secret-key"
+        algorithm: "HS256"
+    - name: limit-req
+      enable: true
+      config:
+        rate: 15
+        burst: 30
+        key: "remote_addr"
+        rejected_code: 429
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: portal-bot-route
+  annotations:
+    kubernetes.io/ingress.class: apisix
+spec:
+  http:
+  - name: bot-traffic
+    priority: 100  # Bot trafiği için
+    match:
+      hosts:
+      - "*"
+      paths:
+      - "/*"
+      exprs:
+      - subject:
+          scope: Header
+          name: User-Agent
+        op: RegexMatch
+        value: ".*(bot|crawler|spider|scraper|googlebot|bingbot).*"
+    backends:
+    - serviceName: portal-svc-bot
+      servicePort: 80
+    plugins:
+    - name: limit-req
+      enable: true
+      config:
+        rate: 5
+        burst: 10
+        key: "remote_addr"
+        rejected_code: 429
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: portal-normal-route
+  annotations:
+    kubernetes.io/ingress.class: apisix
+spec:
+  http:
+  - name: normal-traffic
+    priority: 50  # Normal kullanıcılar için en düşük priority
+    match:
+      hosts:
+      - "*"
+      paths:
+      - "/*"
+    backends:
+    - serviceName: portal-svc
+      servicePort: 80
+    plugins:
+    - name: limit-req
+      enable: true
+      config:
+        rate: 50
+        burst: 100
+        key: "remote_addr"
+        rejected_code: 429

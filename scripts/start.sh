@@ -25,68 +25,13 @@ else
     exit 1
 fi
 
-# APISIX route'larını ekle
-echo "🛣️ APISIX route'ları kuruluyor..."
-kubectl port-forward -n apisix service/apisix-admin 9180:9180 >/dev/null 2>&1 &
-PF_PID=$!
+# Gelişmiş routing konfigürasyonunu uygula
+echo "🛣️ Gelişmiş APISIX routing konfigürasyonu uygulanıyor..."
+kubectl apply -f k8s/advanced-bot-routing.yaml
+kubectl apply -f k8s/simple-jwt-routing.yaml
 
-# Route'ların eklenmesi için bekle
-sleep 3
-
-# Bot route ekle
-echo "🤖 Bot route ekleniyor..."
-curl -X PUT \
-  -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "uri": "/*",
-    "priority": 100,
-    "vars": [["http_user_agent", "~~", ".*(bot|crawler|spider|scraper|googlebot|bingbot).*"]],
-    "upstream": {
-      "type": "roundrobin",
-      "nodes": {
-        "portal-svc-bot.default.svc.cluster.local:80": 1
-      }
-    },
-    "plugins": {
-      "limit-req": {
-        "rate": 5,
-        "burst": 10,
-        "key": "remote_addr",
-        "key_type": "var",
-        "rejected_code": 429,
-        "rejected_msg": "Bot rate limit exceeded",
-        "nodelay": true
-      }
-    }
-  }' \
-  http://localhost:9180/apisix/admin/routes/1
-
-# Normal route ekle
-echo "🌟 Normal route ekleniyor..."
-curl -X PUT \
-  -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "uri": "/*",
-    "priority": 50,
-    "upstream": {
-      "type": "roundrobin",
-      "nodes": {
-        "portal-svc.default.svc.cluster.local:80": 1
-      }
-    },
-    "plugins": {
-      "limit-req": {
-        "rate": 50,
-        "burst": 100,
-        "key": "remote_addr",
-        "key_type": "var",
-        "rejected_code": 429
-      }
-    }
-  }' \
-  http://localhost:9180/apisix/admin/routes/2
+echo "⏳ Route'ların aktif olması bekleniyor..."
+sleep 5
 
 # Port forward'ı kapat
 kill $PF_PID 2>/dev/null || true
