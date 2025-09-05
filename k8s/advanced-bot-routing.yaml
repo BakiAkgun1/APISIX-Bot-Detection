@@ -6,7 +6,7 @@ metadata:
     kubernetes.io/ingress.class: apisix
 spec:
   http:
-  - name: ip-whitelist-traffic
+  - name: ip-whitelist-traffic-1
     priority: 200  # En yüksek priority - IP whitelist
     match:
       hosts:
@@ -30,17 +30,8 @@ spec:
         time_window: 60
         key: "remote_addr"
         rejected_code: 429
----
-apiVersion: apisix.apache.org/v2
-kind: ApisixRoute
-metadata:
-  name: portal-ip-whitelist-route-5
-  annotations:
-    kubernetes.io/ingress.class: apisix
-spec:
-  http:
-  - name: ip-whitelist-traffic-5
-    priority: 200  # En yüksek priority - IP whitelist
+  - name: ip-whitelist-traffic-2
+    priority: 200
     match:
       hosts:
       - "*"
@@ -63,17 +54,8 @@ spec:
         time_window: 60
         key: "remote_addr"
         rejected_code: 429
----
-apiVersion: apisix.apache.org/v2
-kind: ApisixRoute
-metadata:
-  name: portal-ip-whitelist-route-6
-  annotations:
-    kubernetes.io/ingress.class: apisix
-spec:
-  http:
-  - name: ip-whitelist-traffic-6
-    priority: 200  # En yüksek priority - IP whitelist
+  - name: ip-whitelist-traffic-3
+    priority: 200
     match:
       hosts:
       - "*"
@@ -96,17 +78,8 @@ spec:
         time_window: 60
         key: "remote_addr"
         rejected_code: 429
----
-apiVersion: apisix.apache.org/v2
-kind: ApisixRoute
-metadata:
-  name: portal-ip-whitelist-route-7
-  annotations:
-    kubernetes.io/ingress.class: apisix
-spec:
-  http:
-  - name: ip-whitelist-traffic-7
-    priority: 200  # En yüksek priority - IP whitelist
+  - name: ip-whitelist-traffic-4
+    priority: 200
     match:
       hosts:
       - "*"
