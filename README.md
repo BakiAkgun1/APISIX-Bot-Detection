@@ -228,17 +228,17 @@ kubectl port-forward -n apisix service/apisix-admin 9180:9180 &
 
 ### 3. Test Et
 ```bash
-# Normal kullanıcı
+# Hızlı test
 curl http://localhost:8080
-
-# Bot kullanıcı
 curl -H "User-Agent: Bot" http://localhost:8080
-
-# JWT Admin
 curl -H "X-User-Role: admin" http://localhost:8080
-
-# IP Whitelist
 curl -H "X-Forwarded-For: 192.168.1.100" http://localhost:8080
+
+# Tüm route'ları test et (WSL'de çalıştır)
+./scripts/test-all-routes.sh
+
+# Rate limit test komutlarını kopyala-yapıştır
+cat scripts/rate-limit-test-commands.sh
 ```
 
 ### 4. Sistemi Kapat
@@ -309,16 +309,18 @@ apisix-bot-routing/
 │   ├── portal-svc-bot.yaml             # Bot kullanıcılar için portal
 │   ├── advanced-bot-routing.yaml       # Gelişmiş routing konfigürasyonu
 │   ├── simple-jwt-routing.yaml         # JWT routing konfigürasyonu
-│   └── bot-routing-fixed.yaml          # Eski routing (yedek)
+│   └── bot-routing-fixed.yaml          # Eski routing (silindi)
 └── scripts/
     ├── start.sh                        # Uygulamayı başlatma
     ├── stop.sh                         # Uygulamayı kapatma
-    └── test-advanced-routing.sh        # Test script'i
+    ├── test-advanced-routing.sh        # Test script'i
+    ├── test-all-routes.sh              # Tüm route testleri
+    └── rate-limit-test-commands.sh     # Rate limit test komutları (kopyala-yapıştır)
 ```
 
 ## 🧪 Test Senaryoları
 
-### Başarılı Testler:
+### Temel Testler:
 ```bash
 # IP Whitelist
 curl -H "X-Forwarded-For: 192.168.1.100" http://localhost:8080
@@ -331,6 +333,99 @@ curl -H "X-User-Role: admin" http://localhost:8080
 # Normal User
 curl http://localhost:8080
 # ✅ Normal Sayfa
+```
+
+### Rate Limit Testleri:
+```bash
+# Bot Rate Limit Test (2 req/min)
+echo "=== BOT RATE LIMIT TEST ==="
+for i in {1..5}; do
+  echo -n "Request $i: "
+  response=$(curl -s -w "%{http_code}" -H "User-Agent: Bot" http://localhost:8080 2>/dev/null)
+  status_code=$(echo $response | tail -c 4)
+  echo "HTTP $status_code"
+  if [ "$status_code" = "429" ]; then
+    echo "  🚫 RATE LIMITED!"
+  elif [ "$status_code" = "200" ]; then
+    echo "  ✅ SUCCESS"
+  fi
+  sleep 0.5
+done
+
+# Normal Rate Limit Test (10 req/min)
+echo "=== NORMAL RATE LIMIT TEST ==="
+for i in {1..12}; do
+  echo -n "Request $i: "
+  response=$(curl -s -w "%{http_code}" http://localhost:8080 2>/dev/null)
+  status_code=$(echo $response | tail -c 4)
+  echo "HTTP $status_code"
+  if [ "$status_code" = "429" ]; then
+    echo "  🚫 RATE LIMITED!"
+  elif [ "$status_code" = "200" ]; then
+    echo "  ✅ SUCCESS"
+  fi
+  sleep 0.5
+done
+
+# JWT Bot User Rate Limit Test (2 req/min)
+echo "=== JWT BOT USER RATE LIMIT TEST ==="
+for i in {1..5}; do
+  echo -n "Request $i: "
+  response=$(curl -s -w "%{http_code}" -H "X-User-Type: bot_user" http://localhost:8080 2>/dev/null)
+  status_code=$(echo $response | tail -c 4)
+  echo "HTTP $status_code"
+  if [ "$status_code" = "429" ]; then
+    echo "  🚫 RATE LIMITED!"
+  elif [ "$status_code" = "200" ]; then
+    echo "  ✅ SUCCESS"
+  fi
+  sleep 0.5
+done
+
+# JWT Admin Rate Limit Test (10 req/min)
+echo "=== JWT ADMIN RATE LIMIT TEST ==="
+for i in {1..12}; do
+  echo -n "Request $i: "
+  response=$(curl -s -w "%{http_code}" -H "X-User-Role: admin" http://localhost:8080 2>/dev/null)
+  status_code=$(echo $response | tail -c 4)
+  echo "HTTP $status_code"
+  if [ "$status_code" = "429" ]; then
+    echo "  🚫 RATE LIMITED!"
+  elif [ "$status_code" = "200" ]; then
+    echo "  ✅ SUCCESS"
+  fi
+  sleep 0.5
+done
+
+# Username Routing Rate Limit Test (2 req/min)
+echo "=== USERNAME ROUTING RATE LIMIT TEST ==="
+for i in {1..5}; do
+  echo -n "Request $i: "
+  response=$(curl -s -w "%{http_code}" -H "X-Username: testuser" http://localhost:8080 2>/dev/null)
+  status_code=$(echo $response | tail -c 4)
+  echo "HTTP $status_code"
+  if [ "$status_code" = "429" ]; then
+    echo "  🚫 RATE LIMITED!"
+  elif [ "$status_code" = "200" ]; then
+    echo "  ✅ SUCCESS"
+  fi
+  sleep 0.5
+done
+
+# IP Whitelist Rate Limit Test (2 req/min)
+echo "=== IP WHITELIST RATE LIMIT TEST ==="
+for i in {1..5}; do
+  echo -n "Request $i: "
+  response=$(curl -s -w "%{http_code}" -H "X-Forwarded-For: 192.168.1.100" http://localhost:8080 2>/dev/null)
+  status_code=$(echo $response | tail -c 4)
+  echo "HTTP $status_code"
+  if [ "$status_code" = "429" ]; then
+    echo "  🚫 RATE LIMITED!"
+  elif [ "$status_code" = "200" ]; then
+    echo "  ✅ SUCCESS"
+  fi
+  sleep 0.5
+done
 ```
 
 ### Beklenen Sonuçlar:
