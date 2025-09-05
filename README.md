@@ -211,39 +211,47 @@ Aynı priority değerine sahip route'lar varsa:
 
 ## 🚀 Hızlı Başlangıç
 
-### 1. Sistemi Başlat
+### **Yöntem 1: Manuel Deployment**
 ```bash
-# Tüm sistemi otomatik başlat
+# 1. Sistemi başlat
 ./scripts/start.sh
-```
 
-### 2. Port Forward'ları Başlat
-```bash
-# Terminal 1'de (Gateway)
+# 2. Port forward'ları başlat
 kubectl port-forward -n apisix service/apisix-gateway 8080:80 &
-
-# Terminal 2'de (Admin API)
 kubectl port-forward -n apisix service/apisix-admin 9180:9180 &
-```
 
-### 3. Test Et
-```bash
-# Hızlı test
+# 3. Test et
 curl http://localhost:8080
 curl -H "User-Agent: Bot" http://localhost:8080
 curl -H "X-User-Role: admin" http://localhost:8080
 curl -H "X-Forwarded-For: 192.168.1.100" http://localhost:8080
 
-# Tüm route'ları test et (WSL'de çalıştır)
+# 4. Sistemi kapat
+./scripts/stop.sh
+```
+
+### **Yöntem 2: GitOps ile ArgoCD**
+```bash
+# 1. ArgoCD kur
+./scripts/install-argocd.sh
+
+# 2. ArgoCD CLI kur
+./scripts/install-argocd-cli.sh
+
+# 3. GitOps deployment
+./scripts/gitops-deploy.sh
+
+# 4. ArgoCD UI'da kontrol et
+# https://localhost:8081 (admin + şifre)
+```
+
+### **Test Komutları**
+```bash
+# Tüm route'ları test et
 ./scripts/test-all-routes.sh
 
 # Rate limit test komutlarını kopyala-yapıştır
 cat scripts/rate-limit-test-commands.sh
-```
-
-### 4. Sistemi Kapat
-```bash
-./scripts/stop.sh
 ```
 
 ## 🚪 Otomatik Script'ler
@@ -315,7 +323,10 @@ apisix-bot-routing/
     ├── stop.sh                         # Uygulamayı kapatma
     ├── test-advanced-routing.sh        # Test script'i
     ├── test-all-routes.sh              # Tüm route testleri
-    └── rate-limit-test-commands.sh     # Rate limit test komutları (kopyala-yapıştır)
+    ├── rate-limit-test-commands.sh     # Rate limit test komutları (kopyala-yapıştır)
+    ├── install-argocd.sh               # ArgoCD kurulumu
+    ├── install-argocd-cli.sh           # ArgoCD CLI kurulumu
+    └── gitops-deploy.sh                # GitOps deployment
 ```
 
 ## 🧪 Test Senaryoları

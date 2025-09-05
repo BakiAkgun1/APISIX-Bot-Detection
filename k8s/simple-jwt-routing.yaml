@@ -1,7 +1,7 @@
 apiVersion: apisix.apache.org/v2
 kind: ApisixRoute
 metadata:
-  name: portal-jwt-admin-users
+  name: portal-jwt-routing
   annotations:
     kubernetes.io/ingress.class: apisix
 spec:
@@ -30,6 +30,30 @@ spec:
         time_window: 60
         key: "remote_addr"
         rejected_code: 429
+  - name: jwt-bot-user-traffic
+    priority: 170  # JWT bot kullanıcıları için
+    match:
+      hosts:
+      - "*"
+      paths:
+      - "/*"
+      exprs:
+      - subject:
+          scope: Header
+          name: X-User-Type
+        op: Equal
+        value: "bot_user"
+    backends:
+    - serviceName: portal-svc-bot
+      servicePort: 80
+    plugins:
+    - name: limit-count
+      enable: true
+      config:
+        count: 2
+        time_window: 60
+        key: "remote_addr"
+        rejected_code: 429
 ---
 apiVersion: apisix.apache.org/v2
 kind: ApisixRoute
@@ -50,41 +74,11 @@ spec:
       - subject:
           scope: Header
           name: X-Username
-        op: Equal
-        value: "testuser"
-    backends:
-    - serviceName: portal-svc-bot
-      servicePort: 80
-    plugins:
-    - name: limit-count
-      enable: true
-      config:
-        count: 2
-        time_window: 60
-        key: "remote_addr"
-        rejected_code: 429
----
-apiVersion: apisix.apache.org/v2
-kind: ApisixRoute
-metadata:
-  name: portal-jwt-bot-user-route
-  annotations:
-    kubernetes.io/ingress.class: apisix
-spec:
-  http:
-  - name: jwt-bot-user-traffic
-    priority: 170  # JWT bot kullanıcıları için
-    match:
-      hosts:
-      - "*"
-      paths:
-      - "/*"
-      exprs:
-      - subject:
-          scope: Header
-          name: X-User-Type
-        op: Equal
-        value: "bot_user"
+        op: In
+        values:
+        - "testuser"
+        - "admin_user"
+        - "bot_user"
     backends:
     - serviceName: portal-svc-bot
       servicePort: 80
