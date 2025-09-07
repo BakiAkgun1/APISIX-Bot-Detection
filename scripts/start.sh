@@ -29,6 +29,11 @@ fi
 echo "🛣️ Gelişmiş APISIX routing konfigürasyonu uygulanıyor..."
 kubectl apply -f k8s/advanced-bot-routing.yaml
 kubectl apply -f k8s/simple-jwt-routing.yaml
+kubectl apply -f k8s/jwt-decode-routing.yaml
+
+# JWT Consumer'ları uygula
+echo "🔐 JWT Consumer'ları uygulanıyor..."
+kubectl apply -f k8s/jwt-consumers.yaml
 
 echo "⏳ Route'ların aktif olması bekleniyor..."
 sleep 5

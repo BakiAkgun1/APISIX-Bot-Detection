@@ -16,6 +16,10 @@ echo "🛣️ Gelişmiş routing konfigürasyonları kapatılıyor..."
 kubectl delete -f k8s/advanced-bot-routing.yaml --ignore-not-found=true
 kubectl delete -f k8s/simple-jwt-routing.yaml --ignore-not-found=true
 
+# JWT Consumer'ları sil
+echo "🔐 JWT Consumer'ları kapatılıyor..."
+kubectl delete -f k8s/jwt-consumers.yaml --ignore-not-found=true
+
 # Tüm APISIX route'larını temizle
 echo "🛣️ Tüm APISIX route'ları temizleniyor..."
 kubectl delete apisixroute --all --ignore-not-found=true

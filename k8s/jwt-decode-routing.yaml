@@ -1,0 +1,258 @@
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: jwt-decode-route
+  annotations:
+    kubernetes.io/ingress.class: apisix
+spec:
+  http:
+  - name: jwt-decode-traffic
+    priority: 500
+    match:
+      hosts:
+      - "*"
+      paths:
+      - "/api/test"
+    backends:
+    - serviceName: portal-svc
+      servicePort: 8080  # 🔧 Port düzeltildi (gerekirse 80 yapın)
+    plugins:
+    - name: serverless-pre-function
+      enable: true
+      config:
+        phase: "access"
+        functions:
+        - |
+          return function(conf, ctx)
+            local core = require("apisix.core")
+            local jwt = require("resty.jwt")
+            local token = core.request.header(ctx, "authorization")
+            
+            if not token then
+              core.log.info("No JWT token found")
+              core.response.exit(401, {
+                message = "Authorization token required",
+                error = "missing_token",
+                timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+              })
+              return
+            end
+            
+            -- Bearer prefix'ini kaldır
+            token = string.gsub(token, "^Bearer ", "")
+            token = string.gsub(token, "^bearer ", "")
+            
+            -- JWT'yi parse et
+            local jwt_obj = jwt:load_jwt(token)
+            
+            if not jwt_obj or not jwt_obj.valid then
+              local error_msg = jwt_obj and jwt_obj.reason or "invalid_format"
+              core.log.error("JWT parse failed: " .. error_msg)
+              core.response.exit(400, {
+                message = "Invalid JWT token",
+                error = error_msg,
+                timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+              })
+              return
+            end
+            
+            -- JWT payload'ını kontrol et
+            if not jwt_obj.payload then
+              core.log.error("JWT payload is empty")
+              core.response.exit(400, {
+                message = "Empty JWT payload",
+                error = "empty_payload",
+                timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+              })
+              return
+            end
+            
+            -- ⚠️ GÜVENLİK UYARISI: Bu kod imza doğrulaması yapmıyor!
+            -- Üretim ortamında jwt-auth plugin'i kullanın
+            
+            -- JWT bilgilerini extract et
+            local payload = jwt_obj.payload
+            local username = payload.GivenName or payload.given_name or 
+                           payload.name or payload.username or "unknown"
+            local email = payload.Email or payload.email or "unknown"
+            local sub = payload.sub or "unknown"
+            local issuer = payload.iss or "unknown"
+            local exp = payload.exp or "unknown"
+            local iat = payload.iat or "unknown"
+            
+            -- Role bilgisini işle
+            local role = "unknown"
+            if payload.Role then
+              if type(payload.Role) == "table" then
+                role = table.concat(payload.Role, ", ")
+              else
+                role = tostring(payload.Role)
+              end
+            elseif payload.role then
+              if type(payload.role) == "table" then
+                role = table.concat(payload.role, ", ")
+              else
+                role = tostring(payload.role)
+              end
+            elseif payload.roles then
+              if type(payload.roles) == "table" then
+                role = table.concat(payload.roles, ", ")
+              else
+                role = tostring(payload.roles)
+              end
+            end
+            
+            -- Expiration check (opsiyonel)
+            local current_time = os.time()
+            local is_expired = false
+            if exp and exp ~= "unknown" and tonumber(exp) then
+              is_expired = current_time > tonumber(exp)
+            end
+            
+            -- Detaylı loglama
+            core.log.info("=== JWT DECODED ===")
+            core.log.info("Username: " .. username)
+            core.log.info("Email: " .. email)
+            core.log.info("Role: " .. role)
+            core.log.info("Sub: " .. sub)
+            core.log.info("Issuer: " .. issuer)
+            core.log.info("Expired: " .. tostring(is_expired))
+            core.log.info("==================")
+            
+            -- Response body oluştur
+            local response_body = {
+              message = "JWT Token Decoded Successfully",
+              status = "success",
+              timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+              security_warning = "This endpoint does not validate JWT signature!",
+              jwt_info = {
+                header = jwt_obj.header,
+                payload = {
+                  username = username,
+                  email = email,
+                  role = role,
+                  sub = sub,
+                  issuer = issuer,
+                  issued_at = iat,
+                  expires_at = exp,
+                  is_expired = is_expired
+                },
+                token_stats = {
+                  algorithm = jwt_obj.header and jwt_obj.header.alg or "unknown",
+                  type = jwt_obj.header and jwt_obj.header.typ or "unknown"
+                }
+              }
+            }
+            
+            -- İsteği sonlandır ve response dön
+            core.response.exit(200, response_body)
+          end
+    - name: limit-count
+      enable: true
+      config:
+        count: 100
+        time_window: 60
+        key: "remote_addr"
+        rejected_code: 429
+        rejected_msg: "Too many requests"
+
+---
+# 🔧 GÜVENLİ ALTERNATIF: Gerçek JWT Doğrulama ile
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: jwt-auth-route
+  annotations:
+    kubernetes.io/ingress.class: apisix
+spec:
+  http:
+  - name: jwt-auth-traffic
+    priority: 600
+    match:
+      hosts:
+      - "*"
+      paths:
+      - "/api/secure"
+    backends:
+    - serviceName: portal-svc
+      servicePort: 8080
+    plugins:
+    - name: jwt-auth
+      enable: true
+      config:
+        header: "authorization"
+        query: "jwt"
+        cookie: "jwt"
+        hide_credentials: false
+        store_in_ctx: true
+    - name: serverless-post-function
+      enable: true
+      config:
+        phase: "header_filter"
+        functions:
+        - |
+          return function(conf, ctx)
+            local core = require("apisix.core")
+            
+            -- JWT bilgilerini context'ten al (jwt-auth plugin tarafından saklanmış)
+            if ctx.jwt_auth_payload then
+              core.log.info("=== AUTHENTICATED JWT INFO ===")
+              core.log.info("Payload: " .. core.json.encode(ctx.jwt_auth_payload))
+              core.log.info("==============================")
+              
+              -- Response header'a JWT bilgilerini ekle
+              local payload = ctx.jwt_auth_payload
+              if payload.GivenName or payload.name then
+                core.response.set_header("X-User-Name", payload.GivenName or payload.name)
+              end
+              if payload.Email or payload.email then
+                core.response.set_header("X-User-Email", payload.Email or payload.email)
+              end
+              if payload.sub then
+                core.response.set_header("X-User-Sub", payload.sub)
+              end
+            end
+          end
+
+---
+# Consumer'lar (değiştirilmemiş)
+apiVersion: apisix.apache.org/v2
+kind: ApisixConsumer
+metadata:
+  name: admin-consumer
+  annotations:
+    kubernetes.io/ingress.class: apisix
+spec:
+  authParameter:
+    jwtAuth:
+      key: "admin-user"
+      secret: "admin-secret-key"
+      algorithm: "HS256"
+
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixConsumer
+metadata:
+  name: bot-consumer
+  annotations:
+    kubernetes.io/ingress.class: apisix
+spec:
+  authParameter:
+    jwtAuth:
+      key: "bot-user"
+      secret: "bot-secret-key"
+      algorithm: "HS256"
+
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixConsumer
+metadata:
+  name: normal-consumer
+  annotations:
+    kubernetes.io/ingress.class: apisix
+spec:
+  authParameter:
+    jwtAuth:
+      key: "normal-user"
+      secret: "normal-secret-key"
+      algorithm: "HS256"

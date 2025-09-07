@@ -1,0 +1,39 @@
+apiVersion: apisix.apache.org/v2
+kind: ApisixConsumer
+metadata:
+  name: admin-consumer
+  annotations:
+    kubernetes.io/ingress.class: apisix
+spec:
+  authParameter:
+    jwtAuth:
+      key: "admin-user"
+      secret: "admin-secret-key"
+      algorithm: "HS256"
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixConsumer
+metadata:
+  name: bot-consumer
+  annotations:
+    kubernetes.io/ingress.class: apisix
+spec:
+  authParameter:
+    jwtAuth:
+      key: "bot-user"
+      secret: "bot-secret-key"
+      algorithm: "HS256"
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixConsumer
+metadata:
+  name: normal-consumer
+  annotations:
+    kubernetes.io/ingress.class: apisix
+spec:
+  authParameter:
+    jwtAuth:
+      key: "normal-user"
+      secret: "normal-secret-key"
+      algorithm: "HS256"
+

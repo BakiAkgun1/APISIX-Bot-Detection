@@ -8,8 +8,10 @@ IP listesi, JWT token ve username ile kullanıcıları bot servisine yönlendire
 - **JWT Header Routing**: `X-User-Type: bot_user` ve `X-User-Role: admin` ile yönlendirme
 - **Username Routing**: `X-Username: testuser` ile bot servisine yönlendirme
 - **Bot User-Agent Detection**: `User-Agent: Bot` ile otomatik bot tespiti
+- **JWT Bot Routing Plugin**: JWT token'dan username tespit edip bot/human routing yapan özel plugin
 - **Priority System**: Yüksek priority'li route'lar önce kontrol edilir
 - **Rate Limiting**: Bot kullanıcıları 2 req/min, Normal kullanıcılar 10 req/min
+
 
 ##  Gereksinimler
 
@@ -257,6 +259,14 @@ argocd app sync apisix-bot-routing
 # 6. ArgoCD UI'da kontrol et
 # https://localhost:8081 (admin + şifre)
 ```
+# Kapat (ArgoCD'yi durdur)
+kubectl delete -n argocd deployment argocd-server
+kubectl delete -n argocd deployment argocd-repo-server
+kubectl delete -n argocd deployment argocd-application-controller
+
+# Aç (ArgoCD'yi yeniden başlat)
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
 
 ### **Test Komutları**
 ```bash
