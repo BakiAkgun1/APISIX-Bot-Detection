@@ -1,0 +1,30 @@
+# 🎯 BASİT ÇALIŞAN ROUTING - Adım Adım Test
+# Önce sadece normal route, sonra diğerlerini ekleyeceğiz
+
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: portal-normal-route
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class: apisix
+spec:
+  http:
+  - name: normal-traffic
+    priority: 50  # Normal kullanıcılar için en düşük priority
+    match:
+      hosts:
+      - "*"
+      paths:
+      - "/*"
+    backends:
+    - serviceName: portal-svc
+      servicePort: 80
+    plugins:
+    - name: limit-count
+      enable: true
+      config:
+        count: 100
+        time_window: 60
+        key: "remote_addr"
+        rejected_code: 429

@@ -1,0 +1,125 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jwt-decode-lua
+  namespace: default
+data:
+  jwt-decode-handler.lua: |
+    -- JWT Token Decode ve User Type Detection Handler
+    -- Bu dosya APISIX serverless-pre-function plugin'i tarafından kullanılır
+
+    local core = require("apisix.core")
+    local jwt = require("resty.jwt")
+
+    local function jwt_decode_handler(conf, ctx)
+        -- JWT token'ı Authorization header'dan al
+        local token = core.request.header(ctx, "authorization")
+        if not token then
+            core.log.info("No JWT token found in Authorization header")
+            core.response.exit(400, {
+                success = false,
+                message = "No JWT token found",
+                error = "Missing Authorization header",
+                timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+            })
+            return
+        end
+        
+        -- Bearer prefix'ini temizle
+        token = string.gsub(token, "^Bearer ", "")
+        token = string.gsub(token, "^bearer ", "")
+        
+        core.log.info("JWT token found, attempting to decode...")
+        
+        -- JWT token'ı decode et
+        local jwt_obj = jwt:load_jwt(token)
+        if not jwt_obj or not jwt_obj.valid or not jwt_obj.payload then
+            local error_msg = jwt_obj and jwt_obj.reason or "Token parsing failed"
+            core.log.error("JWT decode failed: " .. error_msg)
+            core.response.exit(400, {
+                success = false,
+                message = "Invalid JWT token",
+                error = error_msg,
+                timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+            })
+            return
+        end
+        
+        -- Payload'dan user bilgilerini çıkar
+        local payload = jwt_obj.payload
+        local username = payload.name or payload.username or "unknown"
+        local sub = payload.sub or "unknown"
+        local admin = payload.admin or false
+        local email = payload.Email or payload.email or "unknown"
+        local given_name = payload.GivenName or payload.given_name or "unknown"
+        local surname = payload.Surname or payload.surname or "unknown"
+        local role = payload.Role or payload.role or "unknown"
+        
+        core.log.info("=== JWT DECODED SUCCESS ===")
+        core.log.info("Username: " .. username)
+        core.log.info("Subject: " .. sub)
+        core.log.info("Admin: " .. tostring(admin))
+        core.log.info("Email: " .. email)
+        core.log.info("===========================")
+        
+        -- Bot user listesi - bu listeye göre user type belirlenecek
+        local bot_users = {
+            ["bot_user"] = true,
+            ["testuser"] = true,
+            ["admin_user"] = true,
+            ["bot"] = true,
+            ["crawler"] = true,
+            ["spider"] = true,
+            ["scraper"] = true
+        }
+        
+        -- Username ve subject'e göre user type belirle
+        local user_type = "normal"
+        local is_bot = false
+        
+        if bot_users[username] or bot_users[sub] then
+            user_type = "bot"
+            is_bot = true
+            core.log.info("User identified as BOT: " .. username)
+        else
+            core.log.info("User identified as NORMAL: " .. username)
+        end
+        
+        -- Response body hazırla
+        local response_body = {
+            success = true,
+            message = "JWT Token Decoded Successfully",
+            timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+            user_type = user_type,
+            is_bot = is_bot,
+            jwt_decoded = {
+                header = {
+                    algorithm = jwt_obj.header and jwt_obj.header.alg or "unknown",
+                    type = jwt_obj.header and jwt_obj.header.typ or "unknown"
+                },
+                payload = {
+                    username = username,
+                    subject = sub,
+                    admin = admin,
+                    email = email,
+                    given_name = given_name,
+                    surname = surname,
+                    role = role,
+                    issued_at = payload.iat or "unknown",
+                    expires_at = payload.exp or "unknown",
+                    issuer = payload.iss or "unknown",
+                    audience = payload.aud or "unknown"
+                }
+            },
+            routing_decision = {
+                target_service = is_bot and "portal-svc-bot" or "portal-svc",
+                target_page = is_bot and "Bot Page (Red)" or "Normal Page (Green)",
+                rate_limit = is_bot and "2 req/min" or "100 req/min"
+            }
+        }
+        
+        -- JSON response döndür ve işlemi sonlandır
+        core.response.exit(200, response_body)
+    end
+
+    return jwt_decode_handler

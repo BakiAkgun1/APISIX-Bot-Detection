@@ -1,539 +1,266 @@
-#  APISIX Gelişmiş Bot Routing Sistemi
+# 🤖 APISIX Bot Routing System
 
-IP listesi, JWT token ve username ile kullanıcıları bot servisine yönlendiren akıllı routing sistemi.
+Apache APISIX kullanarak bot trafiğini normal kullanıcı trafiğinden ayıran akıllı routing sistemi.
 
-##  Özellikler
+## 📋 İçindekiler
 
-- **IP Whitelist Routing**: 4 farklı IP'den gelen istekler bot servisine
-- **JWT Header Routing**: `X-User-Type: bot_user` ve `X-User-Role: admin` ile yönlendirme
-- **Username Routing**: `X-Username: testuser` ile bot servisine yönlendirme
-- **Bot User-Agent Detection**: `User-Agent: Bot` ile otomatik bot tespiti
-- **JWT Bot Routing Plugin**: JWT token'dan username tespit edip bot/human routing yapan özel plugin
-- **Priority System**: Yüksek priority'li route'lar önce kontrol edilir
-- **Rate Limiting**: Bot kullanıcıları 2 req/min, Normal kullanıcılar 10 req/min
+- [Özellikler](#-özellikler)
+- [Mimari](#-mimari)
+- [Kurulum](#-kurulum)
+- [Kullanım](#-kullanım)
+- [Routing Kuralları](#-routing-kuralları)
+- [Test](#-test)
+- [Troubleshooting](#-troubleshooting)
 
+## ✨ Özellikler
 
-##  Gereksinimler
+- **🎯 Akıllı Bot Detection**: User-Agent, IP whitelist ve JWT tabanlı bot algılama
+- **⚡ Yüksek Performans**: Apache APISIX ile düşük latency
+- **🔐 JWT Authentication**: Token tabanlı kimlik doğrulama
+- **📊 Rate Limiting**: Bot ve normal kullanıcılar için farklı rate limit'ler
+- **🎨 Visual Feedback**: Bot'lar için kırmızı, normal kullanıcılar için yeşil sayfa
+- **🐳 Kubernetes Native**: Tam Kubernetes entegrasyonu
+- **📈 GitOps Ready**: ArgoCD ile otomatik deployment
 
-- **Kubernetes Cluster** (4 nodeluk cluster ile test edildi)
-- **kubectl** CLI tool
-- **Helm 3.x**
-- **WSL2 Ubuntu** (Windows kullanıcıları için)
+## 🏗️ Mimari
 
-##  Kurulum Adımları
-
-### 1. WSL Ubuntu Kurulumu (Windows için)
-
-```bash
-# WSL Ubuntu kurulumu
-wsl --install -d Ubuntu
-
-# Ubuntu'yu başlat ve güncelle
-sudo apt update && sudo apt upgrade -y
-
-# Gerekli paketleri kur
-sudo apt install -y curl wget git
+```mermaid
+graph TD
+    A[İstek] --> B{APISIX Gateway}
+    B -->|Priority: 1000| C[JWT Decode /jwt-decode]
+    B -->|Priority: 200| D[IP Whitelist]
+    B -->|Priority: 100| E[Bot User-Agent]
+    B -->|Priority: 50| F[Normal Traffic]
+    
+    C --> G[JWT Response]
+    D --> H[portal-svc-bot 🔴]
+    E --> H
+    F --> I[portal-svc 🟢]
+    
+    H --> J[Bot Sayfası<br/>Kırmızı Arka Plan<br/>2 req/min]
+    I --> K[Normal Sayfa<br/>Yeşil Arka Plan<br/>100 req/min]
 ```
 
-### 2. Kubernetes Cluster Kontrolü
+## 🚀 Kurulum
+
+### Ön Gereksinimler
+
+- Kubernetes cluster (v1.20+)
+- kubectl CLI
+- Apache APISIX (Helm ile kurulu)
+
+### 1. Repository'yi Clone Edin
 
 ```bash
-# Cluster bilgilerini kontrol et
-kubectl cluster-info
-
-# Node'ları listele (4 nodeluk cluster)
-kubectl get nodes
-
-# Node detaylarını gör
-kubectl describe nodes
+git clone <repository-url>
+cd apisix-bot-routing
 ```
 
-### 3. Helm Kurulumu
+### 2. APISIX Kurulumu
 
 ```bash
-# Helm indirme (WSL Ubuntu için)
-curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-
-# APISIX Helm repository ekleme
+# APISIX Helm chart'ını ekle
 helm repo add apisix https://charts.apiseven.com
 helm repo update
+
+# APISIX'i kur
+helm install apisix apisix/apisix -n apisix --create-namespace
 ```
 
-### 4. APISIX Namespace Oluşturma
+### 3. Uygulamayı Deploy Edin
 
 ```bash
-kubectl create namespace apisix
-```
-
-### 5. APISIX Kurulumu
-
-```bash
-helm install apisix apisix/apisix \
-  --namespace apisix \
-  --values apisix-working-values.yaml \
-  --wait \
-  --timeout 10m
-```
-
-### 6. Portal Servislerini Deploy Etme
-
-```bash
-# Normal kullanıcılar için portal
+# Service'leri deploy et
 kubectl apply -f k8s/portal-svc.yaml
-
-# Bot kullanıcılar için portal
 kubectl apply -f k8s/portal-svc-bot.yaml
+
+# Routing kurallarını deploy et
+kubectl apply -f k8s/production-routing.yaml
 ```
 
-### 7. APISIX Route Konfigürasyonu
+### 4. Port Forward
 
 ```bash
-# Route'ları uygula
-kubectl apply -f k8s/advanced-bot-routing.yaml
-kubectl apply -f k8s/simple-jwt-routing.yaml
+# APISIX'e erişim için port forward
+kubectl port-forward -n apisix svc/apisix-ingress-controller 8080:8080
 ```
 
-### 8. Port Forward ile Test
+## 🎮 Kullanım
+
+### Normal Kullanıcı Testi
 
 ```bash
-# APISIX Gateway port forward
-kubectl port-forward -n apisix service/apisix-gateway 8080:80 &
+# Browser User-Agent ile test
+curl -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)" http://localhost:8080
 
-# APISIX Admin API port forward
-kubectl port-forward -n apisix service/apisix-admin 9180:9180 &
+# Beklenen: Yeşil arka planlı normal sayfa
 ```
 
-## 🧪 Test Etme
-
-### 1. Normal Kullanıcı Testi
+### Bot Testi
 
 ```bash
-curl http://localhost:8080
-```
-
-**Beklenen Çıktı:**
-```html
-🌟 Portal Ana Sayfa
-Hoşgeldiniz! Bu normal kullanıcılar için portal sayfası.
-Rate Limit: 10 req/saniye (Normal kullanıcılar için yüksek)
-```
-
-### 2. Bot Kullanıcı Testi
-
-```bash
+# Bot User-Agent ile test
 curl -H "User-Agent: Bot" http://localhost:8080
+
+# Beklenen: Kırmızı arka planlı bot sayfası
 ```
 
-**Beklenen Çıktı:**
-```html
-🤖 Portal Bot Sayfası
-Bot trafiği için özel sayfa
-Rate Limit: 2 req/saniye (Bot için düşük)
-```
-
-### 3. JWT Header Testleri
+### JWT Token Testi
 
 ```bash
-# Bot User Test
-curl -H "X-User-Type: bot_user" http://localhost:8080
+# JWT decode endpoint'ini test et
+curl -H "Authorization: Bearer YOUR_JWT_TOKEN" http://localhost:8080/jwt-decode
 
-# Admin User Test
-curl -H "X-User-Role: admin" http://localhost:8080
-
-# Username Routing Test
-curl -H "X-Username: testuser" http://localhost:8080
+# Beklenen: JWT decode response
 ```
 
-### 4. IP Whitelist Testleri
+### Otomatik Test
 
 ```bash
-# 4 farklı IP testi
-curl -H "X-Forwarded-For: 192.168.1.100" http://localhost:8080
-curl -H "X-Forwarded-For: 192.168.1.101" http://localhost:8080
-curl -H "X-Forwarded-For: 10.0.0.50" http://localhost:8080
-curl -H "X-Forwarded-For: 172.16.0.25" http://localhost:8080
+# Tüm testleri çalıştır
+chmod +x scripts/jwt-token-test.sh
+./scripts/jwt-token-test.sh
 ```
 
-##  Priority Sıralaması
+## 📋 Routing Kuralları
 
-1. **Priority 200**: IP Whitelist (4 IP) → Bot servisi
-2. **Priority 170**: JWT Bot Users → Bot servisi
-3. **Priority 100**: Bot User-Agent → Bot servisi
-4. **Priority 80**: JWT Admin Users → Normal servis
-5. **Priority 70**: Username Routing → Bot servisi
-6. **Priority 50**: Normal Users → Normal servis
+| Priority | Kural | Target Service | Rate Limit | Açıklama |
+|----------|-------|----------------|------------|----------|
+| 1000 | `/jwt-decode` | portal-svc | - | JWT token decode endpoint |
+| 200 | IP Whitelist | portal-svc-bot | 2 req/min | Özel IP'ler için bot sayfası |
+| 100 | User-Agent: "Bot" | portal-svc-bot | 2 req/min | Bot User-Agent detection |
+| 50 | Diğer tüm trafik | portal-svc | 100 req/min | Normal kullanıcılar |
 
-##  Manuel Route Ekleme
+### Service'ler
 
-Eğer otomatik route'lar çalışmazsa manuel olarak ekleyebilirsin:
+- **portal-svc**: Normal kullanıcılar için yeşil sayfa
+- **portal-svc-bot**: Bot'lar için kırmızı sayfa
+
+## 🧪 Test
+
+### Test Script'i Çalıştırma
 
 ```bash
-# Bot User Route
-curl -X PUT -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
-  -H "Content-Type: application/json" \
-  -d '{"uri": "/*", "priority": 170, "vars": [["http_x_user_type", "==", "bot_user"]], "upstream": {"type": "roundrobin", "nodes": {"portal-svc-bot.default.svc.cluster.local:80": 1}}, "plugins": {"limit-req": {"rate": 15, "burst": 30, "key": "remote_addr", "rejected_code": 429}}}' \
-  http://localhost:9180/apisix/admin/routes/1
-
-# Admin User Route
-curl -X PUT -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
-  -H "Content-Type: application/json" \
-  -d '{"uri": "/*", "priority": 160, "vars": [["http_x_user_role", "==", "admin"]], "upstream": {"type": "roundrobin", "nodes": {"portal-svc.default.svc.cluster.local:80": 1}}, "plugins": {"limit-req": {"rate": 25, "burst": 50, "key": "remote_addr", "rejected_code": 429}}}' \
-  http://localhost:9180/apisix/admin/routes/3
-
-# IP Whitelist Route
-curl -X PUT -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
-  -H "Content-Type: application/json" \
-  -d '{"uri": "/*", "priority": 200, "vars": [["http_x_forwarded_for", "~~", "192\\.168\\.1\\.(100|101)|10\\.0\\.0\\.50|172\\.16\\.0\\.25"]], "upstream": {"type": "roundrobin", "nodes": {"portal-svc-bot.default.svc.cluster.local:80": 1}}, "plugins": {"limit-req": {"rate": 10, "burst": 20, "key": "remote_addr", "rejected_code": 429}}}' \
-  http://localhost:9180/apisix/admin/routes/4
-
-# Normal User Route
-curl -X PUT -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
-  -H "Content-Type: application/json" \
-  -d '{"uri": "/*", "priority": 50, "upstream": {"type": "roundrobin", "nodes": {"portal-svc.default.svc.cluster.local:80": 1}}, "plugins": {"limit-req": {"rate": 50, "burst": 100, "key": "remote_addr", "rejected_code": 429}}}' \
-  http://localhost:9180/apisix/admin/routes/2
+./scripts/jwt-token-test.sh
 ```
 
-## 📈 Rate Limits
+Test script'i şunları kontrol eder:
+- ✅ JWT decode endpoint'inin çalışması
+- ✅ Normal routing (yeşil sayfa)
+- ✅ Bot routing (kırmızı sayfa)
+- ✅ Rate limiting
 
-| Traffic Type | Rate Limit | Burst | Target Service | Priority |
-|--------------|------------|-------|----------------|----------|
-| IP Whitelist (4 IP) | 2 req/min | 4 | portal-svc-bot | 200 |
-| JWT Bot Users | 2 req/min | 4 | portal-svc-bot | 170 |
-| Bot User-Agent | 2 req/min | 4 | portal-svc-bot | 100 |
-| Username Routing | 2 req/min | 4 | portal-svc-bot | 70 |
-| JWT Admin | 10 req/min | 20 | portal-svc | 80 |
-| Normal Traffic | 10 req/min | 20 | portal-svc | 50 |
+### Manuel Test
 
-## ⚠️ Priority Eşitse
-
-Aynı priority değerine sahip route'lar varsa:
-- **İlk eklenen route öncelik alır** (FIFO)
-- Route'ların sırası önemli
-- Daha spesifik match'ler önce kontrol edilir
-
-## 🚀 Hızlı Başlangıç
-
-### **Yöntem 1: Manuel Deployment**
 ```bash
-# 1. Sistemi başlat
-./scripts/start.sh
-
-# 2. Port forward'ları başlat
-kubectl port-forward -n apisix service/apisix-gateway 8080:80 &
-kubectl port-forward -n apisix service/apisix-admin 9180:9180 &
-
-# 3. Test et
+# 1. Normal kullanıcı testi
 curl http://localhost:8080
+
+# 2. Bot testi
 curl -H "User-Agent: Bot" http://localhost:8080
-curl -H "X-User-Role: admin" http://localhost:8080
-curl -H "X-Forwarded-For: 192.168.1.100" http://localhost:8080
 
-# 4. Sistemi kapat
-./scripts/stop.sh
+# 3. JWT decode testi
+curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9..." http://localhost:8080/jwt-decode
 ```
-
-### **Yöntem 2: GitOps ile ArgoCD**
-```bash
-# 1. ArgoCD kur
-./scripts/install-argocd.sh
-
-# 2. ArgoCD CLI kur (WSL'de)
-./scripts/install-argocd-cli.sh
-
-# 3. ArgoCD'ye login ol (WSL'de)
-argocd login localhost:8081
-# Username: admin
-# Password: Kurulum script'inden alınan şifre
-
-# 4. Application oluştur (WSL'de)
-argocd app create apisix-bot-routing \
-  --repo https://github.com/BakiAkgun1/APISIX-Bot-Detection.git \
-  --path k8s \
-  --dest-server https://kubernetes.default.svc \
-  --dest-namespace default \
-  --sync-policy automated
-
-# 5. Sync et (WSL'de)
-argocd app sync apisix-bot-routing
-
-# 6. ArgoCD UI'da kontrol et
-# https://localhost:8081 (admin + şifre)
-```
-# Kapat (ArgoCD'yi durdur)
-kubectl delete -n argocd deployment argocd-server
-kubectl delete -n argocd deployment argocd-repo-server
-kubectl delete -n argocd deployment argocd-application-controller
-
-# Aç (ArgoCD'yi yeniden başlat)
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-
-
-### **Test Komutları**
-```bash
-# Tüm route'ları test et
-./scripts/test-all-routes.sh
-
-# Rate limit test komutlarını kopyala-yapıştır
-cat scripts/rate-limit-test-commands.sh
-```
-
-## 🚪 Otomatik Script'ler
-
-### start.sh - Uygulamayı Başlatma
-```bash
-./scripts/start.sh
-```
-- ✅ APISIX namespace kontrolü
-- ✅ Portal servislerini başlatma
-- ✅ Pod'ların hazır olmasını bekleme
-- ✅ APISIX route'larını otomatik kurma
-
-### stop.sh - Uygulamayı Kapatma
-```bash
-./scripts/stop.sh
-```
-- ✅ Port forward'ları kapatma
-- ✅ Portal servislerini silme
-- ✅ APISIX route'larını temizleme
-
-### test-advanced-routing.sh - Test
-```bash
-./scripts/test-advanced-routing.sh
-```
-- ✅ Tüm routing senaryolarını test etme
 
 ## 🔧 Troubleshooting
 
-### 1. Pod'lar Başlamıyor
+### Port 8080'e Erişilemiyor
+
 ```bash
+# APISIX pod'unu kontrol et
 kubectl get pods -n apisix
-kubectl describe pod <pod-name> -n apisix
-kubectl logs <pod-name> -n apisix
+
+# Port forward'u yeniden başlat
+kubectl port-forward -n apisix svc/apisix-ingress-controller 8080:8080
 ```
 
-### 2. APISIX Route'lar Çalışmıyor
+### Route'lar Çalışmıyor
+
 ```bash
 # Route'ları kontrol et
 kubectl get apisixroute
 
 # Route detaylarını gör
-kubectl describe apisixroute portal-bot-route
+kubectl describe apisixroute portal-normal-route
 ```
 
-### 3. Port Forward Sorunları
+### Service'ler Çalışmıyor
+
 ```bash
-# Port forward'ları temizle
-pkill -f port-forward
+# Service'leri kontrol et
+kubectl get svc
 
-# Yeniden başlat
-kubectl port-forward -n apisix service/apisix-gateway 8080:80
+# Endpoint'leri kontrol et
+kubectl get endpoints portal-svc
 ```
 
-## 📁 Proje Yapısı
+### 404 Hatası Alıyorum
+
+```bash
+# APISIX ingress controller log'larını kontrol et
+kubectl logs -n apisix -l app.kubernetes.io/name=apisix-ingress-controller
+
+# Route'ları yeniden deploy et
+kubectl delete apisixroute --all
+kubectl apply -f k8s/production-routing.yaml
+```
+
+## 📁 Dosya Yapısı
 
 ```
 apisix-bot-routing/
-├── README.md                           # Bu dosya
-├── apisix-working-values.yaml          # APISIX Helm values
-├── k8s/
-│   ├── portal-svc.yaml                 # Normal kullanıcılar için portal
-│   ├── portal-svc-bot.yaml             # Bot kullanıcılar için portal
-│   ├── advanced-bot-routing.yaml       # Gelişmiş routing konfigürasyonu
-│   ├── simple-jwt-routing.yaml         # JWT routing konfigürasyonu
-│   └── argocd-application.yaml         # ArgoCD Application tanımı
-└── scripts/
-    ├── start.sh                        # Uygulamayı başlatma
-    ├── stop.sh                         # Uygulamayı kapatma
-    ├── test-advanced-routing.sh        # Test script'i
-    ├── test-all-routes.sh              # Tüm route testleri
-    ├── rate-limit-test-commands.sh     # Rate limit test komutları (kopyala-yapıştır)
-    ├── install-argocd.sh               # ArgoCD kurulumu
-    ├── install-argocd-cli.sh           # ArgoCD CLI kurulumu
-    └── gitops-deploy.sh                # GitOps deployment
+├── k8s/                           # Kubernetes manifests
+│   ├── production-routing.yaml    # Ana routing kuralları
+│   ├── portal-svc.yaml           # Normal sayfa service
+│   ├── portal-svc-bot.yaml       # Bot sayfa service
+│   ├── jwt-decode-only.yaml      # JWT decode endpoint
+│   └── jwt-lua-configmap.yaml    # JWT handler Lua script
+├── scripts/                       # Test ve deployment script'leri
+│   ├── jwt-token-test.sh         # Ana test script'i
+│   ├── start.sh                  # Başlatma script'i
+│   ├── stop.sh                   # Durdurma script'i
+│   └── test-all-routes.sh        # Tüm route testleri
+├── jwt-decode-handler.lua         # JWT decode Lua handler
+└── README.md                      # Bu dosya
 ```
 
-## 🧪 Test Senaryoları
+## 🚀 Production Deployment
 
-### Temel Testler:
-```bash
-# IP Whitelist
-curl -H "X-Forwarded-For: 192.168.1.100" http://localhost:8080
-# ✅ Bot Sayfası
-
-# Admin User
-curl -H "X-User-Role: admin" http://localhost:8080  
-# ✅ Normal Sayfa
-
-# Normal User
-curl http://localhost:8080
-# ✅ Normal Sayfa
-```
-
-### Rate Limit Testleri:
-```bash
-# Bot Rate Limit Test (2 req/min)
-echo "=== BOT RATE LIMIT TEST ==="
-for i in {1..5}; do
-  echo -n "Request $i: "
-  response=$(curl -s -w "%{http_code}" -H "User-Agent: Bot" http://localhost:8080 2>/dev/null)
-  status_code=$(echo $response | tail -c 4)
-  echo "HTTP $status_code"
-  if [ "$status_code" = "429" ]; then
-    echo "  🚫 RATE LIMITED!"
-  elif [ "$status_code" = "200" ]; then
-    echo "  ✅ SUCCESS"
-  fi
-  sleep 0.5
-done
-
-# Normal Rate Limit Test (10 req/min)
-echo "=== NORMAL RATE LIMIT TEST ==="
-for i in {1..12}; do
-  echo -n "Request $i: "
-  response=$(curl -s -w "%{http_code}" http://localhost:8080 2>/dev/null)
-  status_code=$(echo $response | tail -c 4)
-  echo "HTTP $status_code"
-  if [ "$status_code" = "429" ]; then
-    echo "  🚫 RATE LIMITED!"
-  elif [ "$status_code" = "200" ]; then
-    echo "  ✅ SUCCESS"
-  fi
-  sleep 0.5
-done
-
-# JWT Bot User Rate Limit Test (2 req/min)
-echo "=== JWT BOT USER RATE LIMIT TEST ==="
-for i in {1..5}; do
-  echo -n "Request $i: "
-  response=$(curl -s -w "%{http_code}" -H "X-User-Type: bot_user" http://localhost:8080 2>/dev/null)
-  status_code=$(echo $response | tail -c 4)
-  echo "HTTP $status_code"
-  if [ "$status_code" = "429" ]; then
-    echo "  🚫 RATE LIMITED!"
-  elif [ "$status_code" = "200" ]; then
-    echo "  ✅ SUCCESS"
-  fi
-  sleep 0.5
-done
-
-# JWT Admin Rate Limit Test (10 req/min)
-echo "=== JWT ADMIN RATE LIMIT TEST ==="
-for i in {1..12}; do
-  echo -n "Request $i: "
-  response=$(curl -s -w "%{http_code}" -H "X-User-Role: admin" http://localhost:8080 2>/dev/null)
-  status_code=$(echo $response | tail -c 4)
-  echo "HTTP $status_code"
-  if [ "$status_code" = "429" ]; then
-    echo "  🚫 RATE LIMITED!"
-  elif [ "$status_code" = "200" ]; then
-    echo "  ✅ SUCCESS"
-  fi
-  sleep 0.5
-done
-
-# Username Routing Rate Limit Test (2 req/min)
-echo "=== USERNAME ROUTING RATE LIMIT TEST ==="
-for i in {1..5}; do
-  echo -n "Request $i: "
-  response=$(curl -s -w "%{http_code}" -H "X-Username: testuser" http://localhost:8080 2>/dev/null)
-  status_code=$(echo $response | tail -c 4)
-  echo "HTTP $status_code"
-  if [ "$status_code" = "429" ]; then
-    echo "  🚫 RATE LIMITED!"
-  elif [ "$status_code" = "200" ]; then
-    echo "  ✅ SUCCESS"
-  fi
-  sleep 0.5
-done
-
-# IP Whitelist Rate Limit Test (2 req/min)
-echo "=== IP WHITELIST RATE LIMIT TEST ==="
-for i in {1..5}; do
-  echo -n "Request $i: "
-  response=$(curl -s -w "%{http_code}" -H "X-Forwarded-For: 192.168.1.100" http://localhost:8080 2>/dev/null)
-  status_code=$(echo $response | tail -c 4)
-  echo "HTTP $status_code"
-  if [ "$status_code" = "429" ]; then
-    echo "  🚫 RATE LIMITED!"
-  elif [ "$status_code" = "200" ]; then
-    echo "  ✅ SUCCESS"
-  fi
-  sleep 0.5
-done
-```
-
-### Beklenen Sonuçlar:
-- **Bot Sayfası:** Kırmızı arka plan, "🤖 Portal Bot Sayfası", Rate Limit: 2 req/saniye
-- **Normal Sayfa:** Yeşil arka plan, "🌟 Portal Ana Sayfa", Rate Limit: 10 req/saniye
-
-## 📋 Özet
-
-### ✅ Çalışan Özellikler:
-- **IP Whitelist Routing**: 4 farklı IP (192.168.1.100, 192.168.1.101, 10.0.0.50, 172.16.0.25) - Tek route'da values array
-- **JWT Header Routing**: X-User-Type: bot_user, X-User-Role: admin - Values array ile optimize
-- **Username Routing**: X-Username: testuser - Values array ile genişletilebilir
-- **Bot User-Agent Detection**: User-Agent: Bot
-- **Rate Limiting**: Bot 2 req/min, Normal 10 req/min
-- **Priority System**: 200 → 170 → 100 → 80 → 70 → 50
-- **ArgoCD GitOps**: Otomatik deployment ve sync
-- **Optimize Route'lar**: 7 route → 3 route (values array kullanımı)
-
-### 🚀 Kullanım:
-
-#### **Manuel Deployment:**
-1. `./scripts/start.sh` - Sistemi başlat
-2. Port forward'ları başlat
-3. Test et
-
-#### **GitOps ile ArgoCD:**
-1. `./scripts/install-argocd.sh` - ArgoCD kur
-2. `./scripts/install-argocd-cli.sh` - CLI kur
-3. `argocd app create` - Application oluştur
-4. `argocd app sync` - Sync et
-5. ArgoCD UI'da kontrol et
-
-### 🎯 Son Durum:
-- ✅ **Route'lar optimize edildi** (values array)
-- ✅ **ArgoCD entegrasyonu** hazır
-- ✅ **GitOps workflow** çalışıyor
-- ✅ **Tüm testler** hazır
-- ✅ **Dokümantasyon** güncel
-
-## 🧹 Temizleme
+### ArgoCD ile GitOps
 
 ```bash
-# APISIX'i kaldır
-helm uninstall apisix -n apisix
-
-# Portal servislerini sil
-kubectl delete -f k8s/portal-svc.yaml
-kubectl delete -f k8s/portal-svc-bot.yaml
-
-# Route'ları sil
-kubectl delete -f k8s/advanced-bot-routing.yaml
-kubectl delete -f k8s/simple-jwt-routing.yaml
-
-# Namespace'i sil
-kubectl delete namespace apisix
+# ArgoCD kurulumu
+kubectl apply -f k8s/argocd-application.yaml
 ```
 
-## 🎉 Sonuç
+### Monitoring
 
-Bu kurulum ile aşağıdaki özellikleri elde ettik:
+```bash
+# APISIX metrics
+kubectl port-forward -n apisix svc/apisix-admin 9180:9180
 
-✅ **IP Whitelist Routing**: Belirli IP'lerden gelen istekler bot servisine  
-✅ **JWT Header Routing**: Header tabanlı kullanıcı yönlendirme  
-✅ **Bot Detection**: User-Agent tabanlı bot tespiti  
-✅ **Intelligent Routing**: Bot ve normal kullanıcılar için farklı servisler  
-✅ **Rate Limiting**: Dinamik rate limiting  
-✅ **High Availability**: Kubernetes üzerinde ölçeklenebilir mimari  
+# Prometheus metrics endpoint
+curl http://localhost:9180/apisix/prometheus/metrics
+```
 
-## 🔗 Faydalı Linkler
+## 🤝 Katkıda Bulunma
 
-- [APISIX Documentation](https://apisix.apache.org/docs/)
-- [APISIX Helm Charts](https://github.com/apache/apisix-helm-chart)
-- [Kubernetes Documentation](https://kubernetes.io/docs/)
+1. Fork edin
+2. Feature branch oluşturun (`git checkout -b feature/amazing-feature`)
+3. Commit edin (`git commit -m 'Add some amazing feature'`)
+4. Push edin (`git push origin feature/amazing-feature`)
+5. Pull Request oluşturun
+
+## 📝 License
+
+Bu proje MIT lisansı altında lisanslanmıştır.
+
+## 📞 İletişim
+
+- GitHub Issues: [Issues](https://github.com/your-repo/issues)
+- Documentation: [Wiki](https://github.com/your-repo/wiki)
 
 ---
 
-**Not**: Bu proje WSL Ubuntu üzerinde 4 nodeluk Kubernetes cluster ile test edilmiştir. Production ortamında kullanmadan önce güvenlik ve performans testleri yapılması önerilir.
+**🎯 Bu sistem ile bot trafiğinizi akıllıca yönlendirebilir, normal kullanıcılarınıza daha iyi bir deneyim sunabilirsiniz!**

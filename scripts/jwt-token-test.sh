@@ -1,46 +1,78 @@
 #!/bin/bash
 
-# JWT Token Test Script'i
-echo "🔐 JWT Token Authentication Test"
-echo "================================"
+# JWT Token Decode Test Script
+echo "🔐 JWT Token Decode Test"
+echo "========================"
 
-# JWT Token'ları oluştur (Base64 encoded)
-echo "📝 JWT Token'ları oluşturuluyor..."
+# JWT Decode endpoint'ini test et
+echo "📝 JWT Decode endpoint'i test ediliyor..."
 
-# Admin Token (HS256)
-ADMIN_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkiOiJhZG1pbi11c2VyIiwicm9sZSI6ImFkbWluIiwibmFtZSI6IkFkbWluIFVzZXIiLCJpYXQiOjE1MTYyMzkwMjJ9.abc123"
-
-# Bot Token (HS256)
-BOT_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkiOiJib3QtdXNlciIsInR5cGUiOiJib3RfdXNlciIsIm5hbWUiOiJCb3QgVXNlciIsImlhdCI6MTUxNjIzOTAyMn0.def456"
-
-# Normal Token (HS256)
-NORMAL_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkiOiJub3JtYWwtdXNlciIsInJvbGUiOiJub3JtYWwiLCJuYW1lIjoiTm9ybWFsIFVzZXIiLCJpYXQiOjE1MTYyMzkwMjJ9.ghi789"
+# Test JWT Token (gerçek JWT formatında)
+TEST_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoidGVzdHVzZXIiLCJzdWIiOiIxMjM0NTY3ODkwIiwiaWF0IjoxNTE2MjM5MDIyLCJhZG1pbiI6ZmFsc2V9.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+ADMIN_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiYWRtaW5fdXNlciIsInN1YiI6ImFkbWluIiwiaWF0IjoxNTE2MjM5MDIyLCJhZG1pbiI6dHJ1ZX0.example"
+BOT_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiYm90X3VzZXIiLCJzdWIiOiJib3QiLCJpYXQiOjE1MTYyMzkwMjIsImFkbWluIjpmYWxzZX0.example"
 
 echo "✅ Token'lar hazır!"
 echo ""
 
 # Test fonksiyonu
-test_jwt_route() {
+# JWT Decode endpoint test fonksiyonu
+test_jwt_decode() {
     local test_name="$1"
     local token="$2"
-    local expected_backend="$3"
     
-    echo "🧪 $test_name Testi"
+    echo "🧪 $test_name"
     echo "   Token: ${token:0:50}..."
-    echo "   Beklenen Backend: $expected_backend"
     echo ""
     
-    # İstek gönder
-    response=$(curl -s -H "Authorization: Bearer $token" http://localhost:8080 2>/dev/null)
+    # JWT Decode endpoint'ine istek gönder
+    response=$(curl -s -H "Authorization: Bearer $token" http://localhost:8080/jwt-decode 2>/dev/null)
+    
+    if echo "$response" | grep -q '"success":true'; then
+        echo "   ✅ JWT Decode Başarılı"
+        echo "   User Type: $(echo "$response" | grep -o '"user_type":"[^"]*"' | cut -d'"' -f4)"
+        echo "   Is Bot: $(echo "$response" | grep -o '"is_bot":[^,}]*' | cut -d':' -f2)"
+    else
+        echo "   ❌ JWT Decode Başarısız"
+        echo "   Response: $response"
+    fi
+    
+    echo ""
+}
+
+# Normal routing test fonksiyonu
+test_normal_routing() {
+    echo "🧪 Normal Routing Testi"
+    echo ""
+    
+    # Normal browser User-Agent ile test
+    response=$(curl -s -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" http://localhost:8080 2>/dev/null)
+    
+    if echo "$response" | grep -q "Portal Ana Sayfa"; then
+        echo "   ✅ Normal Sayfa (portal-svc) - Yeşil Arka Plan"
+    elif echo "$response" | grep -q "Portal Bot Sayfası"; then
+        echo "   ❌ Bot Sayfası (portal-svc-bot) - Kırmızı Arka Plan"
+    else
+        echo "   ❌ Bilinmeyen yanıt: ${response:0:100}..."
+    fi
+    
+    echo ""
+}
+
+# Bot routing test fonksiyonu
+test_bot_routing() {
+    echo "🧪 Bot Routing Testi"
+    echo ""
+    
+    # Bot User-Agent ile test
+    response=$(curl -s -H "User-Agent: Bot" http://localhost:8080 2>/dev/null)
     
     if echo "$response" | grep -q "Portal Bot Sayfası"; then
-        echo "   ✅ Bot Sayfası (portal-svc-bot)"
+        echo "   ✅ Bot Sayfası (portal-svc-bot) - Kırmızı Arka Plan"
     elif echo "$response" | grep -q "Portal Ana Sayfa"; then
-        echo "   ✅ Normal Sayfa (portal-svc)"
-    elif echo "$response" | grep -q "401"; then
-        echo "   ❌ Authentication Failed (401)"
+        echo "   ❌ Normal Sayfa (portal-svc) - Yeşil Arka Plan"
     else
-        echo "   ❌ Bilinmeyen yanıt"
+        echo "   ❌ Bilinmeyen yanıt: ${response:0:100}..."
     fi
     
     echo ""
@@ -58,16 +90,26 @@ echo "✅ Port 8080 erişilebilir"
 echo ""
 
 # Testleri çalıştır
-echo "🎯 JWT Token Testleri"
-echo "===================="
+echo "🎯 APISIX Bot Routing Testleri"
+echo "==============================="
 
-test_jwt_route "Admin Token" "$ADMIN_TOKEN" "portal-svc"
-test_jwt_route "Bot Token" "$BOT_TOKEN" "portal-svc-bot"
-test_jwt_route "Normal Token" "$NORMAL_TOKEN" "portal-svc"
+# JWT Decode testleri
+echo "1️⃣ JWT Decode Endpoint Testleri"
+echo "--------------------------------"
+test_jwt_decode "Normal User Token" "$TEST_TOKEN"
+test_jwt_decode "Admin User Token" "$ADMIN_TOKEN"
+test_jwt_decode "Bot User Token" "$BOT_TOKEN"
 
-echo "🎉 JWT Token testleri tamamlandı!"
+# Routing testleri
+echo "2️⃣ Routing Testleri"
+echo "-------------------"
+test_normal_routing
+test_bot_routing
+
+echo "🎉 Tüm testler tamamlandı!"
 echo ""
-echo "💡 Gerçek JWT token'ları için:"
-echo "   https://jwt.io/ adresini kullanabilirsin"
-echo "   Secret key'leri consumer'larda tanımlı"
+echo "💡 Not:"
+echo "   - Normal kullanıcılar YEŞİL sayfayı görmeli"
+echo "   - Bot'lar KIRMIZI sayfayı görmeli"
+echo "   - JWT decode endpoint /jwt-decode'da çalışıyor"
 
