@@ -1,0 +1,35 @@
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: portal-normal-route
+  annotations:
+    kubernetes.io/ingress.class: apisix
+spec:
+  http:
+  - name: normal-traffic
+    priority: 50
+    match:
+      hosts:
+      - "*"
+      paths:
+      - "/*"
+      exprs:
+      - subject:
+          scope: Header
+          name: User-Agent
+        op: RegexMatch
+        value: "Mozilla"
+    backends:
+    - serviceName: portal-svc
+      servicePort: 80
+    plugins:
+    - name: limit-count
+      enable: true
+      config:
+        count: 10
+        time_window: 1
+        key: "remote_addr"
+        key_type: "var"
+        rejected_code: 429
+        rejected_msg: "Normal user rate limit exceeded (10 req/s)"
+        policy: "local"

@@ -48,7 +48,7 @@ data:
         <p>Hoşgeldiniz! Bu normal kullanıcılar için portal sayfası.</p>
         <p><strong>Node:</strong> <script>document.write(window.location.hostname)</script></p>
         <p><strong>Timestamp:</strong> <script>document.write(new Date())</script></p>
-        <p><strong>Rate Limit:</strong> 10 req/saniye (Normal kullanıcılar için yüksek)</p>
+        <p><strong>Rate Limit:</strong> 50 req/saniye</p>
     </body>
     </html>
 ---

@@ -1,0 +1,71 @@
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: portal-bot-route
+  annotations:
+    kubernetes.io/ingress.class: apisix
+spec:
+  http:
+  - name: bot-traffic
+    priority: 100
+    match:
+      hosts:
+      - "*"
+      paths:
+      - "/*"
+      exprs:
+      - subject:
+          scope: Header
+          name: User-Agent
+        op: RegexMatch
+        value: ".*(bot|crawler|spider|scraper|googlebot|bingbot).*"
+    backends:
+    - serviceName: portal-svc-bot
+      servicePort: 80
+    plugins:
+    - name: limit-count
+      enable: true
+      config:
+        count: 2
+        time_window: 1
+        key: "http_user_agent"
+        key_type: "var"
+        rejected_code: 429
+        rejected_msg: "Bot rate limit exceeded (2 req/s)"
+        policy: "local"
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: portal-ip-whitelist-route
+  annotations:
+    kubernetes.io/ingress.class: apisix
+spec:
+  http:
+  - name: ip-whitelist-traffic
+    priority: 150
+    match:
+      hosts:
+      - "*"
+      paths:
+      - "/*"
+      exprs:
+      - subject:
+          scope: Header
+          name: X-Forwarded-For
+        op: RegexMatch
+        value: "^(192\\.168\\.1\\.100|10\\.0\\.0\\.50|172\\.16\\.0\\.25|203\\.0\\.113\\.10)$"
+    backends:
+    - serviceName: portal-svc-bot
+      servicePort: 80
+    plugins:
+    - name: limit-count
+      enable: true
+      config:
+        count: 5
+        time_window: 1
+        key: "remote_addr"
+        key_type: "var"
+        rejected_code: 429
+        rejected_msg: "IP whitelist rate limit exceeded (5 req/s)"
+        policy: "local"

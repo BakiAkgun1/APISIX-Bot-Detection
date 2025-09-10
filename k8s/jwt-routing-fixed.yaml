@@ -1,0 +1,121 @@
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: portal-jwt-normal-route
+  annotations:
+    kubernetes.io/ingress.class: apisix
+spec:
+  http:
+  - name: jwt-normal-traffic
+    priority: 200
+    match:
+      hosts:
+      - "*"
+      paths:
+      - "/jwt-auth"
+    backends:
+    - serviceName: portal-svc
+      servicePort: 80
+    plugins:
+    - name: serverless-pre-function
+      enable: true
+      config:
+        functions:
+        - |
+          return function(conf, ctx)
+            local core = require("apisix.core")
+            local jwt = require("resty.jwt")
+            
+            local token = core.request.header(ctx, "authorization")
+            if not token then
+              core.response.exit(400, {
+                success = false,
+                message = "No JWT token found"
+              })
+              return
+            end
+            
+            token = string.gsub(token, "^Bearer ", "")
+            token = string.gsub(token, "^bearer ", "")
+            
+            local jwt_obj = jwt:load_jwt(token)
+            if not jwt_obj or not jwt_obj.valid or not jwt_obj.payload then
+              core.response.exit(400, {
+                success = false,
+                message = "Invalid JWT token"
+              })
+              return
+            end
+            
+            local payload = jwt_obj.payload
+            local username = payload.name or "unknown"
+            local sub = payload.sub or "unknown"
+            local admin = payload.admin or false
+            
+            local bot_users = {
+              ["bot_user"] = true,
+              ["testuser"] = true,
+              ["admin_user"] = true,
+              ["bot"] = true
+            }
+            
+            local user_type = "normal"
+            if bot_users[username] or bot_users[sub] then
+              user_type = "bot"
+            end
+            
+            core.request.set_header(ctx, "X-User-Type", user_type)
+            core.request.set_header(ctx, "X-Username", username)
+            
+            -- URI'yi root'a yönlendir
+            core.request.set_uri(ctx, "/")
+            
+            core.log.info("JWT User Type: " .. user_type .. " Username: " .. username)
+          end
+        phase: access
+    - name: limit-count
+      enable: true
+      config:
+        count: 20
+        time_window: 1
+        key: "remote_addr"
+        key_type: "var"
+        rejected_code: 429
+        rejected_msg: "JWT route rate limit exceeded (20 req/s)"
+        policy: "local"
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: portal-jwt-bot-route
+  annotations:
+    kubernetes.io/ingress.class: apisix
+spec:
+  http:
+  - name: jwt-bot-traffic
+    priority: 250
+    match:
+      hosts:
+      - "*"
+      paths:
+      - "/jwt-auth"
+      exprs:
+      - subject:
+          scope: Header
+          name: X-User-Type
+        op: Equal
+        value: "bot"
+    backends:
+    - serviceName: portal-svc-bot
+      servicePort: 80
+    plugins:
+    - name: limit-count
+      enable: true
+      config:
+        count: 2
+        time_window: 1
+        key: "remote_addr"
+        key_type: "var"
+        rejected_code: 429
+        rejected_msg: "Bot JWT rate limit exceeded (2 req/s)"
+        policy: "local"
